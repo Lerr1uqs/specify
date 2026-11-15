@@ -6,13 +6,14 @@
 |---|---|---|---|
 | 项目配置 | `spec/config.yaml` | type、kind 等项目级定义 | [config.yaml.md](config.yaml.md) |
 | 正式 spec | `spec/specs/<type>/<spec-id>/spec.md` | 当前生效的事实 | [spec.md.md](spec.md.md) |
-| Change metadata | `spec/changes/<status>/<kind>/<title>/meta-data.yaml` | change 身份、时间、影响目标 | [meta-data.yaml.md](meta-data.yaml.md) |
-| Change proposal | `.../proposal.md` | 为什么改、改什么 | [proposal.md.md](proposal.md.md) |
-| Change design | `.../design.md` | 本次如何实现 | [design.md.md](design.md.md) |
+| Change metadata | `spec/changes/<status>/<kind>/<id>/meta-data.yaml` | change 身份、时间、影响目标 | [meta-data.yaml.md](meta-data.yaml.md) |
+| Change context | `.../change.md` | 问题、背景、目标与必要的设计说明 | [change.md.md](change.md.md) |
 | Change tasks | `.../tasks.md` | 可执行、可跟踪的实施工作 | [tasks.md.md](tasks.md.md) |
 | Delta | `.../deltas/<type>/<spec-id>.md` | 对正式 spec 中 Contract 的增量 | [delta.md.md](delta.md.md) |
 | 规格索引 | `spec/spec-index.md` | 当前正式 spec 的自动导航 | [spec-index.md.md](spec-index.md.md) |
 
-`init.yaml` 与最终写入项目的 `spec/config.yaml` 使用同一格式；前者是 `specify init . --config init.yaml` 的输入，后者是初始化输出。
+`init.yaml` 与最终写入项目的 `spec/config.yaml` 使用同一格式；前者是 `specify init . --config init.yaml` 的输入，后者是初始化输出。CLI 随发行附带一份默认初始化文件作为起点。
+
+`rejected/` 下的 change 适用更宽松的要求：只要求 `meta-data.yaml`（含 `rejectedReason`）与 `change.md`，其余文件按 rejection 当时的状态冻结。`change.md` 没有强制章节；见 [03-change-artifacts-and-metadata.md](../03-change-artifacts-and-metadata.md)。
 
 `changes/archived/manifest.json` 是不可变 archive 的机器清单，属于实现细节；其格式在 archive 实现阶段另行定义。

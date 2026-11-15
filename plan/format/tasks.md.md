@@ -3,7 +3,7 @@
 ## 位置
 
 ```text
-spec/changes/<status>/<kind>/<title>/tasks.md
+spec/changes/<status>/<kind>/<id>/tasks.md
 ```
 
 ## 格式

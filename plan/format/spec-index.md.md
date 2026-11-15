@@ -17,18 +17,19 @@ spec/spec-index.md
 
 # Spec Index
 
-## capability
+## Capability
 
-- [`user-auth`](specs/capability/user-auth/spec.md) — 用户认证的上下文、目的和动机摘要。
+- [`user-auth`](specs/capability/user-auth/spec.md)
 
-## component
+## Component
 
-- [`auth-service`](specs/component/auth-service/spec.md) — 认证服务的上下文、目的和动机摘要。
+- [`auth-service`](specs/component/auth-service/spec.md)
 ```
 
 ## 生成规则
 
 - 只扫描 `specs/<type>/<spec-id>/spec.md`。
-- 每个条目的简介提取自该 spec 的 `# proposal` 区块。
+- 分组标题为**首字母大写**的 type key（`capability` → `## Capability`），不是 `label`，也不是全小写的 key。
+- 每个条目只包含 spec-id 与正式 spec 的相对链接，不提取正文摘要。
 - 按 type、再按 spec-id 的稳定字典序排序。
 - 不收录 change、delta、rejected 或 archived 内容。

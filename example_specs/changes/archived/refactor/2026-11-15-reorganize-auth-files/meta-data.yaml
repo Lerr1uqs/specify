@@ -1,0 +1,10 @@
+id: reorganize-auth-files
+title: 整理认证模块文件结构
+kind: refactor
+
+createdAt: 2026-11-10T11:00:00+08:00
+updatedAt: 2026-11-15T15:00:00+08:00
+
+specImpact:
+  kind: none
+  reason: 仅移动内部文件，不改变正式 Contract。

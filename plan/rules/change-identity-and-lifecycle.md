@@ -19,6 +19,8 @@ changes/proposed/bugfix/add-login/
 
 同一主题后续工作必须使用新 ID，例如 `add-login-v2` 或 `fix-login-validation`。
 
+归档时目录名变为 `changes/archived/<kind>/YYYY-MM-DD-<id>/`。日期前缀只表达归档顺序，不参与身份：`meta-data.yaml` 中的 `id` 保持不加前缀的原值，唯一性检查在剥离 `YYYY-MM-DD-` 前缀后进行。这是“目录名等于 ID”的唯一例外，其他任何状态下的目录名都必须与 ID 完全一致。
+
 ## Spec ID 只在 Type 内唯一
 
 正式 spec 的路径是：
@@ -34,10 +36,10 @@ specs/capability/auth/spec.md
 specs/component/auth/spec.md
 ```
 
-它们由 `<type>:<spec-id>` 区分。Contract 的内部机器引用再追加从 title 即时计算的 hash：
+它们由 `<type>:<spec-id>` 区分。Contract 的机器引用再追加其在该 spec 内稳定的显式 ID：
 
 ```text
-<type>:<spec-id>:<contract-hash>
+<type>:<spec-id>:<contract-id>
 ```
 
 ## 固定状态迁移
@@ -56,6 +58,13 @@ proposed ──> implemented ──> archived
 ## 完成与归档
 
 - 进入 `implemented/` 前，proposal、design、tasks、metadata 和 delta 必须通过格式与引用校验。
-- `specify change verify <id>` 必须成功，确认实现与正式 Contract、delta、proposal、design、tasks 一致。
+- `specify change verify <id>` 必须成功。它是**纯机器判定**：格式、引用、Contract ID 与 title 的存在性和冲突、`affects`/delta/正式 spec 的对应、任务编号与 checkbox 等确定性规则。它不判断“实现是否符合意图”，那是 review 与 agent 的职责。
 - `tasks.md` 所有 checkbox 必须完成。
-- 只有满足上述条件的 implemented change 可以 archive。archive 合并 delta、冻结历史并更新 `spec-index.md`。
+- 只有满足上述条件的 implemented change 可以 archive。含 delta 的 change 还必须先成功 `sync`；archive 核对同步回执后冻结历史，不再次写正式 spec。
+
+## 拒绝与删除
+
+- `specify change reject <id>` 只接受 `proposed/` 的 change，移动到 `rejected/` 并写入一行 `rejectedReason`。
+- rejected change 冻结的是提案本身：不要求 tasks 完成、不要求 `verify` 通过、不要求 delta 合并；其 delta 永不进入 `sync` 或 `archive` 的合并路径。
+- rejected change 只在它的理由仍能阻止一个可能重犯的错误时保留。
+- `specify change remove <id>` 删除整个 change 目录，只接受 `proposed/` 与 `rejected/`。`implemented/` 的结论可能已被 `sync` 写入 `specs/`，`archived/` 是冻结审计，两者都不允许删除。

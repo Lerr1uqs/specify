@@ -1,0 +1,26 @@
+{
+  "entries": [
+    {
+      "archivedAt": "2026-11-15T15:00:00+08:00",
+      "id": "reorganize-auth-files",
+      "kind": "refactor",
+      "path": "refactor/2026-11-15-reorganize-auth-files/change.md",
+      "sha256": "4d669c0edb5fa34f795fe7b509b48209a18c9da8e8530120255fed65e07fd256"
+    },
+    {
+      "archivedAt": "2026-11-15T15:00:00+08:00",
+      "id": "reorganize-auth-files",
+      "kind": "refactor",
+      "path": "refactor/2026-11-15-reorganize-auth-files/meta-data.yaml",
+      "sha256": "787f494661505a98adbc985bb6988d35f06c4fa7ba5e7a630b2ed4e548e17ba6"
+    },
+    {
+      "archivedAt": "2026-11-15T15:00:00+08:00",
+      "id": "reorganize-auth-files",
+      "kind": "refactor",
+      "path": "refactor/2026-11-15-reorganize-auth-files/tasks.md",
+      "sha256": "68c64b83c849bbd841ce171e9f9608810777dd16e1b51a0c02da472a0c96eac0"
+    }
+  ],
+  "version": 1
+}

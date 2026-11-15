@@ -1,0 +1,17 @@
+specTypes:
+  capability:
+    label: 能力
+    description: 用户或外部系统可观察的行为
+    template: template/capability.md
+  component:
+    label: 组件
+    description: 模块职责、边界和依赖
+    template: template/component.md
+
+kinds:
+  feat:
+    label: 功能
+    description: 新增或扩展正式能力
+  refactor:
+    label: 重构
+    description: 改善内部结构而不改变 Contract

@@ -1,0 +1,45 @@
+specTypes:
+  requirement:
+    label: 需求
+    description: 业务目标、触发条件和必须达到的结果
+    template: template/requirement.md
+  capability:
+    label: 能力
+    description: 面向用户或外部系统的可观察行为
+    template: template/capability.md
+  feature:
+    label: 特性
+    description: 一组面向用户的新功能和预期行为
+    template: template/feature.md
+  component:
+    label: 组件
+    description: 模块职责、边界、接口与依赖
+    template: template/component.md
+  architecture:
+    label: 架构
+    description: 系统、子系统和组件的结构关系
+    template: template/architecture.md
+  rule:
+    label: 规则
+    description: 跨能力或组件适用的稳定约束
+    template: template/rule.md
+
+kinds:
+  feat:
+    label: 功能
+    description: 新增或扩展正式能力、组件或规则
+  bugfix:
+    label: 修复
+    description: 修复实现或正式 spec 的错误
+  simplify:
+    label: 简化
+    description: 降低复杂度而不增加能力
+  refactor:
+    label: 重构
+    description: 改善内部结构
+  arch:
+    label: 架构
+    description: 调整组件边界、依赖或架构决策
+  test:
+    label: 测试
+    description: 补充或调整验证覆盖

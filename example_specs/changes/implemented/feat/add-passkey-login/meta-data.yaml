@@ -1,0 +1,24 @@
+id: add-passkey-login
+title: 增加通行密钥登录
+kind: feat
+
+createdAt: 2026-11-12T09:00:00+08:00
+updatedAt: 2026-11-15T14:30:00+08:00
+
+affects:
+  - type: capability
+    id: user-auth
+    change: modify
+  - type: component
+    id: auth-service
+    change: modify
+
+baseVersions:
+  "capability:user-auth:password-login": "b920e27cd4486ebff977096d053b0df1286ad04b7218dbb5e7d33a4872f438cf"
+  "component:auth-service:credential-validation": "966b5080a4f312cb3c178a175a41e8b62e13815d01e1175bb10d9c35a7029851"
+
+sync:
+  appliedAt: 2026-11-15T14:30:00+08:00
+  deltaHashes:
+    "capability/user-auth.md": "073f86e68b8033c1ecd39f8cbde895e30c0304e22af75d3c2def579584a0f20f"
+    "component/auth-service.md": "4dcda53c0976adae2d112cfaefed077554103941e5f7bd7ad1bad4e48dc4716d"
