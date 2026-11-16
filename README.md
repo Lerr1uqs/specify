@@ -16,6 +16,16 @@ uv sync
 uv run specify --help
 ```
 
+### 安装 AI 工作流 skill
+
+使用 Node.js 22.20 或更新版本，在要使用 Specify 的项目中安装仓库内的 `specify-workflow` skill：
+
+```bash
+npx skills add Lerr1uqs/specify --skill specify-workflow
+```
+
+安装后，可让支持 skills 的 agent 按 `specify-workflow` 执行创建、基线验证、同步和归档流程。skill 只提供操作指引；Specify CLI 仍需按上面的步骤安装。首次使用前先运行 `specify --help`（从本仓库源码运行时为 `uv run specify --help`）。
+
 初始化一个 Specify 项目：
 
 ```bash
