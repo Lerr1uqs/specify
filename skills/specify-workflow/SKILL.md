@@ -1,6 +1,6 @@
 ---
 name: specify-workflow
-description: Use the Specify CLI to create and maintain Markdown Contract specs and changes, including baseline verification, sync, and archive. Use when working in a repository with spec/config.yaml; not for OpenSpec changes.
+description: 查询 Specify CLI 命令和完整 Contract/change 生命周期时使用的简明参考。适用于询问工具用法；具体探索、起草、实施或归档工作分别使用对应的 specify skill。
 ---
 
 # Specify 工作流
