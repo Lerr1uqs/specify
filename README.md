@@ -20,15 +20,20 @@ specify --help
 
 ### 安装 AI 工作流 skill
 
-使用 Node.js 22.20 或更新版本，在要使用 Specify 的项目中安装中文工作流 skills：
+使用 Node.js 22.20 或更新版本。在要使用 Specify 的项目中，先用这条命令安装完整流程参考 skill：
+
+```bash
+npx skills add Lerr1uqs/specify --skill specify-workflow
+```
+
+需要探索、提案、实施和归档四个专用 skill 时，安装它们：
 
 ```bash
 npx skills add Lerr1uqs/specify \
   --skill specify-explore \
   --skill specify-propose \
   --skill specify-apply-change \
-  --skill specify-archive-change \
-  --skill specify-workflow
+  --skill specify-archive-change
 ```
 
 四个阶段 skill 分别负责探索、起草、实施和同步归档；`specify-workflow` 提供完整 CLI 流程参考。可只安装需要的 skill。它们只提供 agent 操作指引；Specify CLI 仍需按上面的步骤安装。
