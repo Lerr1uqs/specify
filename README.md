@@ -57,7 +57,7 @@ cd ./my-project
 specify create requirement password-login
 ```
 
-命令会把配置引用的模板复制到 `spec/specs/<type>/<id>/spec.md`。需求模板用 `WHEN / THEN / MUST` 描述业务行为，组件模板介绍职责、边界和依赖，架构模板提供树形结构示例。模板提供写作指引；`validate` 检查 Markdown 与 Contract 结构，不会自动判定业务语义是否完整。
+命令会把配置引用的模板复制到 `spec/specs/<type>/<id>/spec.md`。需求模板示范 `WHEN / THEN / MUST / SHOULD / MAY` 等表述，组件模板介绍职责、边界和依赖，架构模板提供树形结构示例。模板提供写作指引；`validate` 检查 Markdown 与 Contract 结构，不会自动判定业务语义是否完整。
 
 Contract 标题格式为 `## [<contract-id>] <标题>`。方括号中的 kebab-case ID 是稳定标识；类型、spec ID 和 Contract ID 组合成完整引用，例如 `capability:user-auth:password-login`。
 

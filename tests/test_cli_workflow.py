@@ -135,6 +135,21 @@ def test_create_rejects_missing_configured_template(tmp_path: Path) -> None:
     assert not (tmp_path / "spec/specs/requirement/payment-policy").exists()
 
 
+def test_default_requirement_template_creates_valid_distinct_contracts(
+    tmp_path: Path,
+) -> None:
+    """需求模板的四种示例格式可直接创建且 Contract ID 不冲突。"""
+
+    runner = CliRunner()
+    initialize(runner, tmp_path)
+    created = invoke(runner, tmp_path, "create", "requirement", "payment-policy")
+
+    assert created.exit_code == 0, created.output
+    assert invoke(runner, tmp_path, "validate", "--specs").exit_code == 0
+    source = tmp_path / "spec/specs/requirement/payment-policy/spec.md"
+    assert source.read_text(encoding="utf-8").count("## [requirement-") == 4
+
+
 def test_cli_actions_and_no_impact_lifecycle(tmp_path: Path) -> None:
     """覆盖 init/create/index/show/list 和无 spec 影响 change 的完整生命周期。"""
 
