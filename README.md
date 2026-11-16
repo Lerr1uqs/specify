@@ -9,12 +9,14 @@ Specify 是一个以 Markdown Contract 为正式规范、以 change 驱动迭代
 
 ## 安装与启动
 
-在本仓库根目录运行：
+直接从 GitHub 安装 Specify CLI：
 
 ```bash
-uv sync
-uv run specify --help
+uv tool install git+https://github.com/Lerr1uqs/specify.git
+specify --help
 ```
+
+如果在本仓库中开发，运行 `uv sync`，并用 `uv run specify` 代替下文的 `specify`。`uv tool install` 会将 CLI 安装到独立环境；如果安装后找不到 `specify` 命令，运行 `uv tool update-shell` 并重新打开终端。
 
 ### 安装 AI 工作流 skill
 
@@ -24,12 +26,12 @@ uv run specify --help
 npx skills add Lerr1uqs/specify --skill specify-workflow
 ```
 
-安装后，可让支持 skills 的 agent 按 `specify-workflow` 执行创建、基线验证、同步和归档流程。skill 只提供操作指引；Specify CLI 仍需按上面的步骤安装。首次使用前先运行 `specify --help`（从本仓库源码运行时为 `uv run specify --help`）。
+安装后，可让支持 skills 的 agent 按 `specify-workflow` 执行创建、基线验证、同步和归档流程。skill 只提供操作指引；Specify CLI 仍需按上面的步骤安装。
 
 初始化一个 Specify 项目：
 
 ```bash
-uv run specify init ./my-project
+specify init ./my-project
 ```
 
 初始化会生成 `spec/config.yaml`、`spec/specs/`、change 目录、索引，以及 `spec/template/` 下的内置写作模板。重新初始化会保留已存在的模板文件。后续命令在项目目录中运行即可；默认使用当前工作目录。
@@ -40,7 +42,7 @@ uv run specify init ./my-project
 
 ```bash
 cd ./my-project
-uv run specify create requirement password-login
+specify create requirement password-login
 ```
 
 命令会把配置引用的模板复制到 `spec/specs/<type>/<id>/spec.md`。需求模板用 `WHEN / THEN / MUST` 描述业务行为，组件模板介绍职责、边界和依赖，架构模板提供树形结构示例。模板提供写作指引；`validate` 检查 Markdown 与 Contract 结构，不会自动判定业务语义是否完整。
@@ -52,23 +54,23 @@ Contract 标题格式为 `## [<contract-id>] <标题>`。方括号中的 kebab-c
 创建影响正式 spec 的 change，编辑生成的 `change.md`、`tasks.md` 和 delta：
 
 ```bash
-uv run specify change create feat add-password-login \
+specify change create feat add-password-login \
   --affect capability:user-auth:modify
 ```
 
 对于修改、删除或重命名已有 Contract 的 delta，完成 delta 后显式捕获正文基线。新增 Contract 不需要基线。
 
 ```bash
-uv run specify change baseline add-password-login
-uv run specify change verify add-password-login
+specify change baseline add-password-login
+specify change verify add-password-login
 ```
 
 实现并完成 tasks 后，将 change 标记为 implemented，再同步到正式 spec，最后归档：
 
 ```bash
-uv run specify change implement add-password-login
-uv run specify change sync add-password-login
-uv run specify change archive add-password-login
+specify change implement add-password-login
+specify change sync add-password-login
+specify change archive add-password-login
 ```
 
 如果 sync 检测到基线变化，会拒绝整次同步。阅读最新 Contract、调整 delta，并重新运行 `change baseline` 后再验证和同步。成功 sync 后 delta 被回执固定；后续语义调整应另建 change。Archive 只归档已同步 change，不重放 delta。
@@ -78,10 +80,10 @@ uv run specify change archive add-password-login
 ## 常用命令
 
 ```bash
-uv run specify validate
-uv run specify list
-uv run specify show capability:user-auth
-uv run specify index build
+specify validate
+specify list
+specify show capability:user-auth
+specify index build
 ```
 
 `validate` 可用 `--specs`、`--changes` 或 `--archived` 限定检查范围；全局 `--json` 选项会输出机器可读结果。
