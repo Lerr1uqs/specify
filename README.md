@@ -33,6 +33,8 @@ npx skills add Lerr1uqs/specify \
 
 四个阶段 skill 分别负责探索、起草、实施和同步归档；`specify-workflow` 提供完整 CLI 流程参考。可只安装需要的 skill。它们只提供 agent 操作指引；Specify CLI 仍需按上面的步骤安装。
 
+阶段划分借鉴了 [OpenSpec 的开源 skills](https://github.com/Fission-AI/OpenSpec/tree/main/skills)；具体步骤按 Specify 的 Contract、基线、tasks 和同步回执协议编写。
+
 初始化一个 Specify 项目：
 
 ```bash
