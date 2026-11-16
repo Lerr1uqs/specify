@@ -41,6 +41,45 @@ def complete_tasks(change_dir: Path) -> None:
     )
 
 
+def test_human_status_shows_change_progress_without_changing_agent_output(
+    tmp_path: Path,
+) -> None:
+    """人类表格展示 kind 和任务进度，默认及 JSON 查询仍可解析。"""
+
+    runner = CliRunner()
+    initialize(runner, tmp_path)
+    write_spec(tmp_path, "capability", "auth", "login", "登录", "用户可以登录。")
+    created = invoke(runner, tmp_path, "change", "create", "bugfix", "fix-login")
+    assert created.exit_code == 0, created.output
+
+    assert invoke(runner, tmp_path, "list").output == "capability:auth\n"
+    listed = invoke(runner, tmp_path, "--json", "list")
+    assert json.loads(listed.output)["specs"] == [
+        {"type": "capability", "id": "auth", "status": "valid"}
+    ]
+    human_list = invoke(runner, tmp_path, "list", "--human")
+    assert human_list.exit_code == 0
+    assert "capability" in human_list.output and "valid" in human_list.output
+
+    status = invoke(runner, tmp_path, "status")
+    assert status.exit_code == 0
+    assert json.loads(status.output)["changes"][0]["tasks"] == {
+        "done": 0,
+        "total": 1,
+    }
+    human_status = invoke(runner, tmp_path, "status", "--human")
+    assert human_status.exit_code == 0
+    assert "bugfix" in human_status.output
+    assert "proposed" in human_status.output
+    assert "0/1" in human_status.output
+    assert "\x1b[" not in human_status.output
+
+    for command in ("list", "status"):
+        conflict = invoke(runner, tmp_path, "--json", command, "--human")
+        assert conflict.exit_code == 2
+        assert "不能同时使用" in conflict.output
+
+
 def test_init_preserves_customized_templates(tmp_path: Path) -> None:
     """重复初始化保留作者修改过的模板文档。"""
 

@@ -87,11 +87,20 @@ specify change archive add-password-login
 ```bash
 specify validate
 specify list
+specify list --human
+specify status --human
 specify show capability:user-auth
 specify index build
 ```
 
-`validate` 可用 `--specs`、`--changes` 或 `--archived` 限定检查范围；全局 `--json` 选项会输出机器可读结果。
+`list` 默认输出稳定的每行一个 `type:id`；`list --human` 显示正式 spec 的校验状态和关联 change 数。`status` 默认输出 JSON，`status --human` 还显示每个 change 的 kind、生命周期状态、校验结果和 tasks 进度。`--human` 与全局 `--json` 互斥。`validate` 可用 `--specs`、`--changes` 或 `--archived` 限定检查范围。
+
+查看本仓库示例项目：
+
+```bash
+uv run specify --root example_specs list --human
+uv run specify --root example_specs status --human
+```
 
 ## 开发检查
 

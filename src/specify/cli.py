@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import json
 import shutil
+import sys
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 import click
+from rich.console import Console
 
 from .archive import archive_change, validate_archived
 from .baseline import capture_baselines
@@ -22,6 +24,7 @@ from .models import Change, Issue
 from .parse.spec import parse_spec_file
 from .paths import RepoPaths, find_change, validate_id
 from .scaffold import create_change, create_spec, initialize
+from .status import HumanStatus, ProjectStatus
 from .sync import sync_change
 from .validate.changes import read_metadata, validate_change, validate_changes
 from .validate.specs import validate_specs
@@ -409,26 +412,58 @@ def validate_command(
 
 @main.command("list")
 @click.option("--type", "spec_type")
+@click.option("--human", is_flag=True, help="用表格展示正式 spec 状态。")
 @click.pass_context
-def list_command(context: click.Context, spec_type: str | None) -> None:
-    """列出正式 spec，可按配置类型筛选。"""
+def list_command(context: click.Context, spec_type: str | None, human: bool) -> None:
+    """列出正式 spec；默认保持一行一项的稳定输出。"""
 
     try:
+        if human and context.obj["json"]:
+            raise UsageError("--human 与 --json 不能同时使用")
         paths = project_paths(context)
         config = load_config(paths)
         if spec_type and spec_type not in config["specTypes"]:
             raise SpecifyError(f"未知 spec type：{spec_type}")
-        items = list_specs(paths, config, spec_type)
-        if context.obj["json"]:
+        if human or context.obj["json"]:
+            status = ProjectStatus(paths).read()
+            selected = [
+                item
+                for item in status["specs"]
+                if spec_type is None or item["type"] == spec_type
+            ]
+        if human:
+            HumanStatus(Console(file=sys.stdout)).specs(selected)
+        elif context.obj["json"]:
             payload = {
                 "specs": [
-                    {"type": item_type, "id": spec_id} for item_type, spec_id in items
+                    {"type": item["type"], "id": item["id"], "status": item["status"]}
+                    for item in selected
                 ]
             }
             click.echo(json.dumps(payload, ensure_ascii=False, sort_keys=True))
         else:
-            for item_type, spec_id in items:
+            for item_type, spec_id in list_specs(paths, config, spec_type):
                 click.echo(f"{item_type}:{spec_id}")
+    except SpecifyError as error:
+        CommandOutput.fail(context, error)
+
+
+@main.command("status")
+@click.option("--human", is_flag=True, help="用表格展示正式 spec 和 change 状态。")
+@click.pass_context
+def status_command(context: click.Context, human: bool) -> None:
+    """查询项目状态；默认输出 JSON，Rich 展示需显式指定。"""
+
+    try:
+        if human and context.obj["json"]:
+            raise UsageError("--human 与 --json 不能同时使用")
+        status = ProjectStatus(project_paths(context)).read()
+        if human:
+            presenter = HumanStatus(Console(file=sys.stdout))
+            presenter.specs(status["specs"])
+            presenter.changes(status["changes"])
+        else:
+            click.echo(json.dumps(status, ensure_ascii=False, sort_keys=True))
     except SpecifyError as error:
         CommandOutput.fail(context, error)
 

@@ -25,6 +25,6 @@ Specify 项目以 `spec/config.yaml` 为入口。正式规范在 `spec/specs/<ty
 
 ## 当前 CLI 的输出边界
 
-全局 `--json` 放在子命令前，例如 `specify --json list`、`specify --json change verify <change-id>`。当前 `list --json` 仅提供 `type` 和 `id`，没有状态或 change 关联；没有全局 `status`、`--human` 或重叠 change 的预检命令。`change status <change-id>` 只查询单个 change。不要把这些尚未实现的接口写入脚本或承诺给用户。
+全局 `--json` 放在子命令前，例如 `specify --json list`、`specify --json change verify <change-id>`。`list` 默认每行一个 `type:id`，`list --human` 展示正式 spec 表格；`status` 默认输出 JSON，`status --human` 展示包含 kind、状态和 tasks 进度的 change 表格。`--human` 与 `--json` 互斥。`change status <change-id>` 只查询单个 change；目前没有重叠 change 的预检命令。
 
 当前校验按 Contract 正文 hash 检测已捕获基线的变化。两个 change 修改同一个 spec 中不同的 Contract 时，只要各自依赖的 Contract 正文没有变化，verify 不会因为它们共享 spec 而拒绝。语义是否冲突仍需根据最新规范判断。
