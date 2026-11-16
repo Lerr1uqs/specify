@@ -19,10 +19,10 @@ specify change archive <id>
 
 specify validate [--specs|--changes|--archived]
 specify show <type>:<spec-id>
-specify list [--type <type>]
+specify list [--change|--spec] [--type <type>] [--human]
 ```
 
-`specify list` 是唯一的列举命令，列出当前正式 spec（`--type` 过滤）；V1 不提供 `type list`。所有 change 命令都以全局唯一的 `<id>` 定位，不接收状态或 kind 作为参数——CLI 自行在 `changes/` 树中查找，归档目录先剥离 `YYYY-MM-DD-` 前缀再匹配。
+`specify list` 默认以 JSON 列出活跃 change 及 tasks 进度；`--change` 显式选择 change，`--spec` 切换为正式 spec（可用 `--type` 过滤）。`--human` 才使用 Rich 表格。V1 不提供 `type list`。所有 change 命令都以全局唯一的 `<id>` 定位，不接收状态或 kind 作为参数——CLI 自行在 `changes/` 树中查找，归档目录先剥离 `YYYY-MM-DD-` 前缀再匹配。
 
 `specify init . --config init.yaml` 读取调用前已存在的 YAML，验证 `specTypes`、`kinds` 等内容，然后创建：
 

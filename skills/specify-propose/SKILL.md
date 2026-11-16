@@ -16,7 +16,7 @@ description: 根据需求在 Specify 项目中创建并写好 proposed change，
 
 ## 输入与目标选择
 
-用户可能只说想做什么，没有提供 ID。先从描述推导 kebab-case ID 和 `spec/config.yaml` 允许的 kind；若目标 Contract 不明确，查 `specify list` 与 `specify show <type>:<id>`。阅读相关的 proposed/implemented change，确认不会重复建同一个变更。若 ID 已存在，检查已有 change 是否就是用户想继续的对象；不要覆盖目录。
+用户可能只说想做什么，没有提供 ID。先从描述推导 kebab-case ID 和 `spec/config.yaml` 允许的 kind；若目标 Contract 不明确，查 `specify list --spec` 与 `specify show <type>:<id>`。阅读相关的 proposed/implemented change，确认不会重复建同一个变更。若 ID 已存在，检查已有 change 是否就是用户想继续的对象；不要覆盖目录。
 
 判断正式规范影响时逐个回答：
 

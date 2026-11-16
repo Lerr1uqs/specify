@@ -18,7 +18,7 @@ from .baseline import capture_baselines
 from .config import dump_yaml, load_config
 from .contract import ContractIdentity
 from .errors import EnvironmentError, ExitCode, SpecifyError, UsageError
-from .index import build_index, list_specs
+from .index import build_index
 from .io import move_to_trash
 from .models import Change, Issue
 from .parse.spec import parse_spec_file
@@ -412,38 +412,57 @@ def validate_command(
 
 @main.command("list")
 @click.option("--type", "spec_type")
-@click.option("--human", is_flag=True, help="用表格展示正式 spec 状态。")
+@click.option(
+    "--change", "list_changes", is_flag=True, help="列出活跃 change（默认）。"
+)
+@click.option("--spec", "list_formal_specs", is_flag=True, help="列出正式 spec。")
+@click.option("--human", is_flag=True, help="用表格展示列表。")
 @click.pass_context
-def list_command(context: click.Context, spec_type: str | None, human: bool) -> None:
-    """列出正式 spec；默认保持一行一项的稳定输出。"""
+def list_command(
+    context: click.Context,
+    spec_type: str | None,
+    list_changes: bool,
+    list_formal_specs: bool,
+    human: bool,
+) -> None:
+    """默认以 JSON 列出活跃 change，并按选项切换正式 spec 与人类表格。"""
 
     try:
         if human and context.obj["json"]:
             raise UsageError("--human 与 --json 不能同时使用")
+        if list_changes and list_formal_specs:
+            raise UsageError("--change 与 --spec 不能同时使用")
+        if spec_type and not list_formal_specs:
+            raise UsageError("--type 只能与 --spec 一起使用")
         paths = project_paths(context)
         config = load_config(paths)
         if spec_type and spec_type not in config["specTypes"]:
             raise SpecifyError(f"未知 spec type：{spec_type}")
-        if human or context.obj["json"]:
-            status = ProjectStatus(paths).read()
-            selected = [
+        status = ProjectStatus(paths).read()
+        if list_formal_specs:
+            items = [
                 item
                 for item in status["specs"]
                 if spec_type is None or item["type"] == spec_type
             ]
-        if human:
-            HumanStatus(Console(file=sys.stdout)).specs(selected)
-        elif context.obj["json"]:
-            payload = {
-                "specs": [
-                    {"type": item["type"], "id": item["id"], "status": item["status"]}
-                    for item in selected
-                ]
-            }
-            click.echo(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+            if human:
+                HumanStatus(Console(file=sys.stdout)).specs(items)
+            else:
+                click.echo(
+                    json.dumps({"specs": items}, ensure_ascii=False, sort_keys=True)
+                )
         else:
-            for item_type, spec_id in list_specs(paths, config, spec_type):
-                click.echo(f"{item_type}:{spec_id}")
+            items = [
+                item
+                for item in status["changes"]
+                if item["status"] in {"proposed", "implemented"}
+            ]
+            if human:
+                HumanStatus(Console(file=sys.stdout)).changes(items)
+            else:
+                click.echo(
+                    json.dumps({"changes": items}, ensure_ascii=False, sort_keys=True)
+                )
     except SpecifyError as error:
         CommandOutput.fail(context, error)
 

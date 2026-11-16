@@ -59,7 +59,15 @@ The CLI SHALL locate Contracts by their explicit IDs, compare changed or removed
 - **THEN** the second run matches the saved receipt, is a no-op, and leaves the formal spec bytes unchanged
 
 ### Requirement: Index, listing, and inspection
-The CLI SHALL list formal specs by optional type, show a requested `<type>:<spec-id>`, and build a deterministic `spec-index.md` from formal spec types and IDs only.
+The CLI SHALL list active changes with task progress by default, switch to formal specs with `--spec` and optional `--type`, show a requested `<type>:<spec-id>`, and build a deterministic `spec-index.md` from formal spec types and IDs only. List output SHALL be JSON by default; `--human` SHALL render the selected collection for people.
+
+#### Scenario: List change progress for people
+- **WHEN** an active change has 10 completed tasks out of 42 and the user runs `specify list --human`
+- **THEN** the change row shows its ID, kind, lifecycle state, validation state, and `10/42` tasks
+
+#### Scenario: Select formal specs
+- **WHEN** the user runs `specify list --spec --human`
+- **THEN** the table lists formal specs and does not represent their change tasks as spec tasks
 
 #### Scenario: Rebuild the index deterministically
 - **WHEN** `specify index build` runs repeatedly without source changes

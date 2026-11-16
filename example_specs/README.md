@@ -4,10 +4,11 @@
 
 ```bash
 uv run specify --root example_specs list --human
+uv run specify --root example_specs list --spec --human
 uv run specify --root example_specs status --human
 ```
 
-第一条展示正式 spec；第二条还展示 change 的 kind、状态和 tasks 进度。默认 `status` 输出 JSON，只有显式指定 `--human` 才使用表格。
+第一条展示活跃 change 的 kind、状态和 tasks 进度；第二条展示正式 spec；第三条展示两者。默认 `list` 和 `status` 输出 JSON，只有显式指定 `--human` 才使用表格。
 
 ## 目录内容
 

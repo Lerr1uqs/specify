@@ -5,7 +5,7 @@ description: 在 Specify 项目中探索需求、Contract 边界和 change 方�
 
 # 探索 Specify 变更
 
-先确认项目存在 `spec/config.yaml`，读取其中的 `specTypes`、`kinds` 和相关模板。根据讨论主题查看 `specify list`、`specify show <type>:<id>`、相关 formal spec，以及现有 change 的 `change.md`、`meta-data.yaml` 和 delta。命令默认作用于当前目录；在本仓库源码中可用 `uv run specify` 替代 `specify`。
+先确认项目存在 `spec/config.yaml`，读取其中的 `specTypes`、`kinds` 和相关模板。根据讨论主题查看 `specify list --spec`、`specify show <type>:<id>`、相关 formal spec，以及现有 change 的 `change.md`、`meta-data.yaml` 和 delta。命令默认作用于当前目录；在本仓库源码中可用 `uv run specify` 替代 `specify`。
 
 帮助用户弄清问题、受影响的 Contract、可观察结果和实现约束。区分“修改正式 Contract”和“仅修复实现”：后者可以使用不带 `--affect` 的 change。若多个 change 涉及同一 spec，重点检查它们实际操作的 Contract ID 与正文，而不是仅凭 spec 路径判定冲突。
 
@@ -19,7 +19,7 @@ description: 在 Specify 项目中探索需求、Contract 边界和 change 方�
 
 ## 从项目取得上下文
 
-先用 `specify list` 查看 formal spec，必要时用 `specify show <type>:<spec-id>` 阅读完整正文。`specify status` 默认输出 JSON，可查看活跃 change 的 `id`、`kind`、`status`、`tasks` 与 `affects`；人类终端需要表格时才加 `--human`。如果用户提到具体 change，读取它的 `change.md`、`tasks.md`、`meta-data.yaml` 与 delta，再看关联的代码。
+先用 `specify list --spec` 查看 formal spec，必要时用 `specify show <type>:<spec-id>` 阅读完整正文。`specify list` 默认输出活跃 change 的 JSON；`specify status` 查看整个项目，两者都包含 change 的 `id`、`kind`、`status`、`tasks` 与 `affects`。人类终端需要表格时才加 `--human`。如果用户提到具体 change，读取它的 `change.md`、`tasks.md`、`meta-data.yaml` 与 delta，再看关联的代码。
 
 若当前目录没有 `spec/config.yaml`，先从用户指定的路径找项目；没有 Specify 项目时仍可讨论问题，但不要假装已查过正式规范。`specify init` 是创建项目的操作，只有用户确实要初始化时才运行。
 

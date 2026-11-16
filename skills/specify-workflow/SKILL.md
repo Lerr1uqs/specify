@@ -10,7 +10,7 @@ Specify 项目以 `spec/config.yaml` 为入口。正式规范在 `spec/specs/<ty
 ## 查看与创建
 
 - 先阅读 `spec/config.yaml`、相关 formal spec 和已有 change，再决定目标 type、ID 与操作。
-- `specify list` 列出 formal spec；`specify show <type>:<id>` 查看内容；`specify validate` 检查项目。
+- `specify list` 列出活跃 change；`specify list --spec` 列出 formal spec；`specify show <type>:<id>` 查看内容；`specify validate` 检查项目。
 - 新项目用 `specify init <目录>` 初始化。新 formal spec 用 `specify create <type> <id>` 创建，然后填写模板中的 Contract。Contract 标题格式为 `## [<contract-id>] <标题>`。
 
 ## 修改 Contract
@@ -25,6 +25,6 @@ Specify 项目以 `spec/config.yaml` 为入口。正式规范在 `spec/specs/<ty
 
 ## 当前 CLI 的输出边界
 
-全局 `--json` 放在子命令前，例如 `specify --json list`、`specify --json change verify <change-id>`。`list` 默认每行一个 `type:id`，`list --human` 展示正式 spec 表格；`status` 默认输出 JSON，`status --human` 展示包含 kind、状态和 tasks 进度的 change 表格。`--human` 与 `--json` 互斥。`change status <change-id>` 只查询单个 change；目前没有重叠 change 的预检命令。
+全局 `--json` 放在子命令前，例如 `specify --json list`、`specify --json change verify <change-id>`。`list` 默认输出活跃 change 的 JSON，`list --human` 展示任务进度表；`list --spec` 切换为正式 spec，`--type` 只用于这个视图。`status` 默认输出整个项目的 JSON，`status --human` 同时展示 spec 和 change。`--human` 与 `--json` 互斥。`change status <change-id>` 只查询单个 change；目前没有重叠 change 的预检命令。
 
 当前校验按 Contract 正文 hash 检测已捕获基线的变化。两个 change 修改同一个 spec 中不同的 Contract 时，只要各自依赖的 Contract 正文没有变化，verify 不会因为它们共享 spec 而拒绝。语义是否冲突仍需根据最新规范判断。

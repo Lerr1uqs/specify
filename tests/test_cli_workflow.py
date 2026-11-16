@@ -41,10 +41,10 @@ def complete_tasks(change_dir: Path) -> None:
     )
 
 
-def test_human_status_shows_change_progress_without_changing_agent_output(
+def test_list_switches_between_change_progress_and_formal_specs(
     tmp_path: Path,
 ) -> None:
-    """人类表格展示 kind 和任务进度，默认及 JSON 查询仍可解析。"""
+    """默认列出 change，--spec 切换正式规范，表格仅由 --human 启用。"""
 
     runner = CliRunner()
     initialize(runner, tmp_path)
@@ -52,14 +52,38 @@ def test_human_status_shows_change_progress_without_changing_agent_output(
     created = invoke(runner, tmp_path, "change", "create", "bugfix", "fix-login")
     assert created.exit_code == 0, created.output
 
-    assert invoke(runner, tmp_path, "list").output == "capability:auth\n"
-    listed = invoke(runner, tmp_path, "--json", "list")
-    assert json.loads(listed.output)["specs"] == [
-        {"type": "capability", "id": "auth", "status": "valid"}
-    ]
+    listed = invoke(runner, tmp_path, "list")
+    assert listed.exit_code == 0
+    assert json.loads(listed.output)["changes"][0]["tasks"] == {
+        "done": 0,
+        "total": 1,
+    }
+    assert json.loads(
+        invoke(runner, tmp_path, "list", "--change").output
+    ) == json.loads(listed.output)
     human_list = invoke(runner, tmp_path, "list", "--human")
     assert human_list.exit_code == 0
-    assert "capability" in human_list.output and "valid" in human_list.output
+    assert "bugfix" in human_list.output
+    assert "proposed" in human_list.output
+    assert "0/1" in human_list.output
+    assert "\x1b[" not in human_list.output
+
+    specs = invoke(runner, tmp_path, "list", "--spec")
+    assert json.loads(specs.output)["specs"][0]["id"] == "auth"
+    human_specs = invoke(runner, tmp_path, "list", "--spec", "--human")
+    assert "capability" in human_specs.output and "valid" in human_specs.output
+    assert invoke(runner, tmp_path, "list", "--change", "--spec").exit_code == 2
+    assert invoke(runner, tmp_path, "list", "--type", "capability").exit_code == 2
+    assert (
+        len(
+            json.loads(
+                invoke(
+                    runner, tmp_path, "list", "--spec", "--type", "capability"
+                ).output
+            )["specs"]
+        )
+        == 1
+    )
 
     status = invoke(runner, tmp_path, "status")
     assert status.exit_code == 0
@@ -69,10 +93,7 @@ def test_human_status_shows_change_progress_without_changing_agent_output(
     }
     human_status = invoke(runner, tmp_path, "status", "--human")
     assert human_status.exit_code == 0
-    assert "bugfix" in human_status.output
-    assert "proposed" in human_status.output
-    assert "0/1" in human_status.output
-    assert "\x1b[" not in human_status.output
+    assert "bugfix" in human_status.output and "0/1" in human_status.output
 
     for command in ("list", "status"):
         conflict = invoke(runner, tmp_path, "--json", command, "--human")
@@ -150,7 +171,12 @@ def test_cli_actions_and_no_impact_lifecycle(tmp_path: Path) -> None:
     )
     assert invoke(runner, tmp_path, "validate", "--specs").exit_code == 0
     assert invoke(runner, tmp_path, "index", "build").exit_code == 0
-    assert "capability:auth" in invoke(runner, tmp_path, "list").output
+    assert any(
+        item["type"] == "capability" and item["id"] == "auth"
+        for item in json.loads(invoke(runner, tmp_path, "list", "--spec").output)[
+            "specs"
+        ]
+    )
     shown = invoke(runner, tmp_path, "--json", "show", "capability:auth")
     assert shown.exit_code == 0
     assert json.loads(shown.output)["contracts"][0]["id"] == "login"
