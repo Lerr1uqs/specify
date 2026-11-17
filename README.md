@@ -50,7 +50,7 @@ specify init ./my-project
 
 ## 创建和编写 spec
 
-配置中的每个 `specTypes` 可以通过 `template` 指定写作模板。默认提供 `requirement`、`capability`、`feature`、`component`、`architecture` 和 `rule` 类型。
+配置中的每个 `specTypes` 可以通过 `template` 指定写作模板。默认提供 `requirement`、`capability`、`component`、`architecture` 和 `rule` 类型；新增功能使用 `feat` change kind，并通过 delta 更新相应的正式 spec。
 
 ```bash
 cd ./my-project

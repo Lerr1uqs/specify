@@ -157,7 +157,8 @@ def test_cli_actions_and_no_impact_lifecycle(tmp_path: Path) -> None:
     initialize(runner, tmp_path)
     assert (tmp_path / "spec/template/requirement.md").is_file()
     assert (tmp_path / "spec/template/capability.md").is_file()
-    assert (tmp_path / "spec/template/feature.md").is_file()
+    assert not (tmp_path / "spec/template/feature.md").exists()
+    assert invoke(runner, tmp_path, "create", "feature", "new-login").exit_code == 1
     assert (tmp_path / "spec/template/architecture.md").is_file()
     assert (tmp_path / "spec/template/component.md").is_file()
 

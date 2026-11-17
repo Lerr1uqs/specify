@@ -23,11 +23,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "description": "面向用户或外部系统的可观察行为",
             "template": "template/capability.md",
         },
-        "feature": {
-            "label": "特性",
-            "description": "一组面向用户的新功能和预期行为",
-            "template": "template/feature.md",
-        },
         "component": {
             "label": "组件",
             "description": "模块职责、边界、接口与依赖",
