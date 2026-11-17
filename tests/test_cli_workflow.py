@@ -150,6 +150,21 @@ def test_default_requirement_template_creates_valid_distinct_contracts(
     assert source.read_text(encoding="utf-8").count("## [requirement-") == 4
 
 
+def test_default_architecture_capability_component_templates_validate(
+    tmp_path: Path,
+) -> None:
+    """内置模板复制为正式 spec 后，Contract ID 和标题都不冲突。"""
+
+    runner = CliRunner()
+    initialize(runner, tmp_path)
+    for spec_type in ("architecture", "capability", "component"):
+        created = invoke(runner, tmp_path, "create", spec_type, f"sample-{spec_type}")
+        assert created.exit_code == 0, created.output
+
+    validated = invoke(runner, tmp_path, "validate", "--specs")
+    assert validated.exit_code == 0, validated.output
+
+
 def test_cli_actions_and_no_impact_lifecycle(tmp_path: Path) -> None:
     """覆盖 init/create/index/show/list 和无 spec 影响 change 的完整生命周期。"""
 
