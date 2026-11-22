@@ -66,9 +66,12 @@ def test_list_switches_between_change_progress_and_formal_specs(
     ) == json.loads(listed.output)
     human_list = invoke(runner, tmp_path, "list", "--human")
     assert human_list.exit_code == 0
-    assert "bugfix" in human_list.output
-    assert "proposed" in human_list.output
-    assert "0/1" in human_list.output
+    assert human_list.output.splitlines() == [
+        "Changes",
+        "└── proposed",
+        "    └── bugfix",
+        "        └── fix-login  valid · 0/1 tasks",
+    ]
     assert "\x1b[" not in human_list.output
 
     specs = invoke(runner, tmp_path, "list", "--spec")

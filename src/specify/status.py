@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Any
 
 from rich.console import Console
-from rich.table import Table
 from rich.text import Text
 from rich.tree import Tree
 
@@ -115,7 +114,7 @@ class ProjectStatus:
 
 
 class HumanStatus:
-    """为显式 --human 选项渲染 Rich 树和表格。"""
+    """为显式 --human 选项渲染 Rich 层级树。"""
 
     def __init__(self, console: Console):
         """绑定 stdout 控制台，沿用 Rich 的终端宽度检测。"""
@@ -148,18 +147,30 @@ class HumanStatus:
         self.console.print(tree)
 
     def changes(self, items: list[dict[str, Any]]) -> None:
-        """展示 change 身份、生命周期、校验结果和任务进度。"""
+        """按状态和 kind 还原目录层级，在 change 旁展示校验与任务进度。"""
 
-        table = Table(title="Changes", expand=True)
-        for heading in ("ID", "Kind", "State", "Validation", "Tasks"):
-            table.add_column(heading, overflow="fold")
-        for item in items:
-            tasks = item["tasks"]
-            table.add_row(
-                item["id"],
-                item["kind"],
-                item["status"],
-                item["validation"],
-                f"{tasks['done']}/{tasks['total']}" if tasks else "—",
-            )
-        self.console.print(table)
+        tree = Tree(Text("Changes", style="bold"), guide_style="dim")
+        state_styles = {
+            "proposed": "bold cyan",
+            "implemented": "bold green",
+            "rejected": "bold yellow",
+        }
+        status_column = max((len(item["id"]) for item in items), default=0) + 2
+        # change 状态和 kind 继承扫描顺序，同一组内包含各个 change ID。
+        for state, changes in groupby(items, key=itemgetter("status")):
+            state_branch = tree.add(Text(state, style=state_styles[state]))
+            for kind, group in groupby(changes, key=itemgetter("kind")):
+                kind_branch = state_branch.add(Text(kind, style="bold magenta"))
+                for item in group:
+                    status = item["validation"]
+                    label = Text.assemble(
+                        (item["id"], "bold"),
+                        " " * (status_column - len(item["id"])),
+                        (status, "green" if status == "valid" else "bold red"),
+                    )
+                    if tasks := item["tasks"]:
+                        label.append(
+                            f" · {tasks['done']}/{tasks['total']} tasks", style="dim"
+                        )
+                    kind_branch.add(label)
+        self.console.print(tree)

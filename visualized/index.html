@@ -6,8 +6,10 @@
   <meta name="description" content="用真实的会话规范和归档变更探索 Specify 的目录、层级与同步流程。">
   <title>Specify 项目图谱</title>
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="structure.css">
   <script src="snapshot.js" defer></script>
   <script src="app.js" defer></script>
+  <script src="structure.js" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#main">跳到正文</a>
@@ -15,6 +17,7 @@
     <div class="wrap masthead-inner">
       <a class="wordmark" href="#main"><span class="brand-symbol" aria-hidden="true"></span>Specify</a>
       <nav aria-label="页面导航">
+        <a href="#structure">结构</a>
         <a href="#map">关系</a>
         <a href="#impact">影响树</a>
         <a href="#history">版本</a>
@@ -33,6 +36,31 @@
         <code>example_specs/</code>
         <span>仓库示例快照 · 2026-11-22</span>
       </div>
+    </section>
+
+    <section id="structure" aria-labelledby="structure-title">
+      <div class="section-heading">
+        <h2 id="structure-title">正式规范树</h2>
+        <p>展开分支查看每份 spec 的 Contract。点选下方的 change，沿分色连线追到各份 delta 的目标 spec。</p>
+      </div>
+      <dl class="structure-terms">
+        <div><dt><code>type</code></dt><dd>规范的类别。一个 type 可包含多份 spec。</dd></div>
+        <div><dt><code>spec</code></dt><dd>一份 <code>spec.md</code>，用 type 和 spec ID 定位。</dd></div>
+        <div><dt><code>Contract ID</code></dt><dd>一份 spec 内可单独变更的条目。完整引用为 <code>type:spec-id:contract-id</code>。</dd></div>
+      </dl>
+      <ul id="structure-legend" class="structure-legend" aria-label="Action 颜色"></ul>
+      <div class="structure-board" id="structure-board">
+        <canvas id="structure-connections" aria-hidden="true"></canvas>
+        <div class="structure-targets" id="structure-targets">
+          <div class="structure-root"><strong>正式规范库</strong><code>spec/specs/</code></div>
+          <ul id="structure-types" class="structure-types" aria-label="按 type 组织的正式规范"></ul>
+        </div>
+        <section class="structure-sources" id="structure-sources" aria-label="Changes 及其 delta">
+          <div id="structure-changes" class="structure-changes"></div>
+          <p class="structure-result" id="structure-result" aria-live="polite"></p>
+        </section>
+      </div>
+      <noscript><p>启用 JavaScript 后可展开规范树并查看 change 连线。</p></noscript>
     </section>
 
     <section id="map" class="map-section" aria-labelledby="map-title">

@@ -120,7 +120,7 @@ specify show capability:user-auth
 specify index build
 ```
 
-`list` 默认输出活跃 change 的 JSON，包括 kind、生命周期状态和 tasks 的已完成/总数。`list --human` 用表格显示这些进度。`list --change` 显式选择 change，`list --spec` 用缩进文本列出正式 spec，`--type` 仅与 `--spec` 搭配。`status` 默认输出整个项目的 JSON，`status --human` 同时显示 spec 和 change。`--human` 与全局 `--json` 互斥。`validate` 可用 `--specs`、`--changes` 或 `--archived` 限定检查范围。
+`list` 默认输出活跃 change 的 JSON，包括 kind、生命周期状态和 tasks 的已完成/总数。`list --human` 用 Rich 树按状态和 kind 分组展示。`list --change` 显式选择 change，`list --spec` 用缩进文本列出正式 spec，`--type` 仅与 `--spec` 搭配。`status` 默认输出整个项目的 JSON，`status --human` 同时显示 spec 和 change。`--human` 与全局 `--json` 互斥。`validate` 可用 `--specs`、`--changes` 或 `--archived` 限定检查范围。
 
 查看本仓库示例项目：
 
