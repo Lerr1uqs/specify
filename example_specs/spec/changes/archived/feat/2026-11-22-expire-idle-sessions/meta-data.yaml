@@ -1,0 +1,25 @@
+id: expire-idle-sessions
+title: 增加会话空闲超时
+kind: feat
+createdAt: '2026-11-22T14:27:44+08:00'
+updatedAt: '2026-11-22T14:28:01+08:00'
+affects:
+- type: capability
+  id: user-auth
+  change: modify
+- type: component
+  id: auth-service
+  change: modify
+baseVersions:
+  capability:user-auth:session-expiry:
+    548a985896cf84a480ee09a59702f88b1f0660532be820aa464e16bc74bfe5fd
+  component:auth-service:session-issuance:
+    945a45c1357d244fb21766b81cc80d41896a1e28e50187a3dfaf81912c9364cd
+sync:
+  appliedAt: '2026-11-22T14:28:01+08:00'
+  deltaHashes:
+    capability/user-auth.md:
+      951a38167a0609d4a52ac5d7b39827c92acbf0dfccd7213dba3966a64a2be3c9
+    component/auth-service.md:
+      9ccf9de6065aff58c12bfa37e2f60db53e6ebac08308505ca727eaa7b5dc4989
+  historyId: 8ed5e6226f034e1394ea2569961c3887

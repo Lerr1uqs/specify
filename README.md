@@ -89,6 +89,21 @@ specify change archive add-password-login
 
 不影响正式 Contract 的 bugfix 可以不创建 delta：`change create` 不传 `--affect` 时会记录 `specImpact.kind: none`。
 
+## Contract 历史
+
+成功同步的 Contract 变更按完整引用保存在 `spec/.history/contracts/<type>/<spec-id>/<contract-id>.jsonl`。同一个引用删除后重新添加，会沿用原文件并继续递增 `idx`。
+
+```bash
+specify history capability:user-auth:session-expiry
+specify history capability:user-auth:session-expiry --limit 5 --human
+specify history capability:user-auth:session-expiry --include-removed --csv > history.csv
+specify history capability:user-auth:session-expiry --diff 1 2 --human
+```
+
+默认以 JSON 返回当前生命周期的最新版本。`--limit` 查询最近几条记录，`--include-removed` 展开以前的生命周期和删除记录，`--diff` 按 `idx` 比较标题和正文，支持跨生命周期比较。用 `--human` 在终端浏览，用 `--csv` 导出记录。
+
+升级已有项目时运行 `specify history --backfill`，把还没有历史的 Contract 以当前正文补记为 `add`。补录日期为执行时的日期，同步时也会为首次被修改或删除的已有 Contract 自动补一条起始记录。
+
 ## 常用命令
 
 ```bash
@@ -109,6 +124,8 @@ specify index build
 uv run specify --root example_specs list --human
 uv run specify --root example_specs list --spec --human
 uv run specify --root example_specs status --human
+uv run specify --root example_specs history capability:user-auth:session-expiry --limit 3 --human
+uv run specify --root example_specs history capability:user-auth:session-expiry --diff 1 2 --human
 ```
 
 ## 开发检查

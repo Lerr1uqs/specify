@@ -18,6 +18,8 @@ from .baseline import capture_baselines
 from .config import dump_yaml, load_config
 from .contract import ContractIdentity
 from .errors import EnvironmentError, ExitCode, SpecifyError, UsageError
+from .history import ContractHistory, active_history, diff_history
+from .history_view import HistoryView, HumanHistory
 from .index import build_index
 from .io import move_to_trash
 from .models import Change, Issue
@@ -523,6 +525,105 @@ def show_command(context: click.Context, reference: str) -> None:
             )
         else:
             click.echo(target.read_text(encoding="utf-8"), nl=False)
+    except SpecifyError as error:
+        CommandOutput.fail(context, error)
+
+
+@main.command("history")
+@click.argument("reference", required=False)
+@click.option("--limit", type=click.IntRange(min=1), help="显示最近 N 条操作。")
+@click.option("--include-removed", is_flag=True, help="展开已删除的生命周期。")
+@click.option(
+    "--diff",
+    "versions",
+    type=(click.IntRange(min=1), click.IntRange(min=1)),
+    help="比较两个版本号。",
+)
+@click.option("--csv", "csv_output", is_flag=True, help="导出 CSV。")
+@click.option("--human", is_flag=True, help="使用 Rich 表格和 diff 展示。")
+@click.option("--backfill", is_flag=True, help="为现有 Contract 添加初始历史快照。")
+@click.pass_context
+def history_command(
+    context: click.Context,
+    reference: str | None,
+    limit: int | None,
+    include_removed: bool,
+    versions: tuple[int, int] | None,
+    csv_output: bool,
+    human: bool,
+    backfill: bool,
+) -> None:
+    """查询按 Contract 划分的同步历史，默认展示当前版本。"""
+
+    try:
+        if sum((human, csv_output, context.obj["json"])) > 1:
+            raise UsageError("--human、--csv、--json 不能同时使用")
+        if backfill:
+            if reference or limit or include_removed or versions or csv_output:
+                raise UsageError("--backfill 只支持输出模式 --human 或 --json")
+            paths = project_paths(context)
+            count = ContractHistory(paths).backfill(
+                load_config(paths), datetime.now().astimezone()
+            )
+            if human:
+                Console(file=sys.stdout).print(f"已回填 {count} 条 Contract 初始版本")
+            else:
+                click.echo(json.dumps({"backfilled": count}))
+            return
+        if not reference:
+            raise UsageError("history 需要完整 Contract 引用或 --backfill")
+        if versions and (limit or include_removed or csv_output):
+            raise UsageError(
+                "--diff 不能与 --limit、--include-removed 或 --csv 同时使用"
+            )
+
+        store = ContractHistory(project_paths(context))
+        records = store.read(store.parse_ref(reference))
+        presenter = HumanHistory(Console(file=sys.stdout)) if human else None
+
+        # diff 使用明确的版本号，允许对比删除前后或多个生命周期。
+        if versions:
+            start, end = versions
+            change = diff_history(reference, records, start, end)
+            if presenter:
+                presenter.diff(reference, start, end, change)
+            else:
+                click.echo(
+                    json.dumps(
+                        {"ref": reference, "from": start, "to": end, "diff": change},
+                        ensure_ascii=False,
+                    )
+                )
+            return
+
+        latest = records[-1] if records else None
+        status = (
+            "empty"
+            if latest is None
+            else "removed"
+            if latest["action"] == "remove"
+            else "active"
+        )
+        result: dict[str, Any] = {"ref": reference, "status": status}
+        if limit or include_removed:
+            selected = records if include_removed else active_history(records)
+            if limit:
+                selected = selected[-limit:]
+            if presenter:
+                presenter.timeline(reference, selected)
+                return
+            result["records"] = [HistoryView.entry(record) for record in selected]
+        else:
+            selected = [latest] if latest else []
+            if presenter:
+                presenter.latest(reference, latest)
+                return
+            result["record"] = HistoryView.entry(latest) if latest else None
+
+        if csv_output:
+            click.echo(HistoryView.csv(reference, selected), nl=False)
+        else:
+            click.echo(json.dumps(result, ensure_ascii=False))
     except SpecifyError as error:
         CommandOutput.fail(context, error)
 

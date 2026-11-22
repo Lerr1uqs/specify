@@ -20,6 +20,76 @@
       "kind": "refactor",
       "path": "refactor/2026-11-15-reorganize-auth-files/tasks.md",
       "sha256": "68c64b83c849bbd841ce171e9f9608810777dd16e1b51a0c02da472a0c96eac0"
+    },
+    {
+      "archivedAt": "2026-11-22T14:27:44+08:00",
+      "id": "define-session-lifetime",
+      "kind": "feat",
+      "path": "feat/2026-11-22-define-session-lifetime/change.md",
+      "sha256": "41a4ede8212366917b03bcefd1fd713fe527d6e9ca035eeb89229e0403d1f7a5"
+    },
+    {
+      "archivedAt": "2026-11-22T14:27:44+08:00",
+      "id": "define-session-lifetime",
+      "kind": "feat",
+      "path": "feat/2026-11-22-define-session-lifetime/deltas/capability/user-auth.md",
+      "sha256": "f36edd013c6a64ccda3d01228223068bcd60560a170a5943b703abbb96826bfa"
+    },
+    {
+      "archivedAt": "2026-11-22T14:27:44+08:00",
+      "id": "define-session-lifetime",
+      "kind": "feat",
+      "path": "feat/2026-11-22-define-session-lifetime/deltas/component/auth-service.md",
+      "sha256": "3010a944015a339d3d43508e3e98b04ace4218fe92dd46905f25f467f860fa8d"
+    },
+    {
+      "archivedAt": "2026-11-22T14:27:44+08:00",
+      "id": "define-session-lifetime",
+      "kind": "feat",
+      "path": "feat/2026-11-22-define-session-lifetime/meta-data.yaml",
+      "sha256": "dcec75eb3be93c1ff9765f7ae4d0f696137fa9e3f732de05b14d1f97451a3450"
+    },
+    {
+      "archivedAt": "2026-11-22T14:27:44+08:00",
+      "id": "define-session-lifetime",
+      "kind": "feat",
+      "path": "feat/2026-11-22-define-session-lifetime/tasks.md",
+      "sha256": "76c3f8f8fb17c520c6cd0bf8355864f473d25e3bd2b4703a056866ebf437954e"
+    },
+    {
+      "archivedAt": "2026-11-22T14:28:01+08:00",
+      "id": "expire-idle-sessions",
+      "kind": "feat",
+      "path": "feat/2026-11-22-expire-idle-sessions/change.md",
+      "sha256": "9e00eb7c157a92ae7c31c78d515ca65121464c4a53deac0ceca62fbae76ef090"
+    },
+    {
+      "archivedAt": "2026-11-22T14:28:01+08:00",
+      "id": "expire-idle-sessions",
+      "kind": "feat",
+      "path": "feat/2026-11-22-expire-idle-sessions/deltas/capability/user-auth.md",
+      "sha256": "951a38167a0609d4a52ac5d7b39827c92acbf0dfccd7213dba3966a64a2be3c9"
+    },
+    {
+      "archivedAt": "2026-11-22T14:28:01+08:00",
+      "id": "expire-idle-sessions",
+      "kind": "feat",
+      "path": "feat/2026-11-22-expire-idle-sessions/deltas/component/auth-service.md",
+      "sha256": "9ccf9de6065aff58c12bfa37e2f60db53e6ebac08308505ca727eaa7b5dc4989"
+    },
+    {
+      "archivedAt": "2026-11-22T14:28:01+08:00",
+      "id": "expire-idle-sessions",
+      "kind": "feat",
+      "path": "feat/2026-11-22-expire-idle-sessions/meta-data.yaml",
+      "sha256": "b4e6a3fe55e982f62f67389b0f13ef817b56c81e638ab00f4f1048876a5431c3"
+    },
+    {
+      "archivedAt": "2026-11-22T14:28:01+08:00",
+      "id": "expire-idle-sessions",
+      "kind": "feat",
+      "path": "feat/2026-11-22-expire-idle-sessions/tasks.md",
+      "sha256": "0ae746ef0293d30005d4a73d6be41fe7329cf2221e821c6eeb7503910200180f"
     }
   ],
   "version": 1

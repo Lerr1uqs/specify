@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="用真实的会话规范和归档变更探索 Specify 的目录、层级与同步流程。">
+  <title>Specify 项目图谱</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="snapshot.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到正文</a>
+  <header class="masthead">
+    <div class="wrap masthead-inner">
+      <a class="wordmark" href="#main"><span class="brand-symbol" aria-hidden="true"></span>Specify</a>
+      <nav aria-label="页面导航">
+        <a href="#map">关系</a>
+        <a href="#impact">影响树</a>
+        <a href="#history">版本</a>
+        <a href="#storage">目录</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="main" class="wrap">
+    <section class="intro" aria-labelledby="page-title">
+      <div>
+        <h1 id="page-title">Specify 项目图谱</h1>
+        <p>从 change 的提案和同步，追到一条 Contract 的当前正文与历史版本。</p>
+      </div>
+      <div class="snapshot-label">
+        <code>example_specs/</code>
+        <span>仓库示例快照 · 2026-11-22</span>
+      </div>
+    </section>
+
+    <section id="map" class="map-section" aria-labelledby="map-title">
+      <div class="section-heading">
+        <h2 id="map-title">规范与变更如何连接</h2>
+        <p><code>type</code> 为 spec 分类，<code>kind</code> 为 change 分类。选择节点可查看文件位置。</p>
+      </div>
+      <div class="map-grid">
+        <div class="diagram">
+          <!-- 两列分别表示正式规范和变更树，中间画出两个跨列关系。 -->
+          <div class="lane-title formal-lane"><span aria-hidden="true"></span>正式规范</div>
+          <div class="lane-title change-lane"><span aria-hidden="true"></span>变更工作流</div>
+
+          <button class="diagram-node formal-node node-type" type="button" data-node="type" aria-pressed="false">
+            <span class="node-role">type</span>
+            <code id="map-type">capability</code>
+          </button>
+          <button class="diagram-node change-node node-kind" type="button" data-node="kind" aria-pressed="false">
+            <span class="node-role">kind</span>
+            <code>feat</code>
+          </button>
+          <div class="vertical-edge formal-edge edge-one" aria-label="一个 type 包含多个规范"><span>包含</span></div>
+          <div class="vertical-edge change-edge edge-one" aria-label="一个 kind 归类多个变更"><span>归类</span></div>
+
+          <button class="diagram-node formal-node node-spec" type="button" data-node="spec" aria-pressed="false">
+            <span class="node-role">spec</span>
+            <code id="map-spec">user-auth</code>
+          </button>
+          <div class="bridge bridge-affects" aria-label="change 的 affects 指向目标 spec">
+            <code>affects</code><span>定位目标</span>
+          </div>
+          <button class="diagram-node change-node node-change" type="button" data-node="change" aria-pressed="false">
+            <span class="node-role">change</span>
+            <code id="map-change">expire-idle-sessions</code>
+          </button>
+          <div class="vertical-edge formal-edge edge-two" aria-label="一个 spec 包含多条 Contract"><span>声明</span></div>
+          <div class="vertical-edge change-edge edge-two" aria-label="有规范影响的变更为每个目标 spec 定义一份 delta"><span>定义</span></div>
+
+          <button class="diagram-node formal-node node-contract" type="button" data-node="contract" aria-pressed="true">
+            <span class="node-role">Contract</span>
+            <code id="map-contract">session-expiry</code>
+          </button>
+          <div class="bridge bridge-sync" aria-label="sync 按 delta 中的 ID 更新 Contract">
+            <code>sync</code><span>应用变更</span>
+          </div>
+          <button class="diagram-node change-node node-delta" type="button" data-node="delta" aria-pressed="false">
+            <span class="node-role">delta</span>
+            <code id="map-delta">capability/user-auth.md</code>
+          </button>
+        </div>
+
+        <aside class="inspector" aria-labelledby="inspector-title">
+          <div class="inspector-main" aria-live="polite">
+            <p class="inspector-label">节点说明</p>
+            <h3 id="inspector-title">Contract</h3>
+            <p id="inspector-description">正式 spec 里按 ID 定位的规范条目。一个 ID 在所属 spec 内唯一。</p>
+            <code id="inspector-path">capability:user-auth:session-expiry</code>
+          </div>
+          <div class="map-legend">
+            <p><span class="legend-mark legend-dotted" aria-hidden="true"></span><span><strong>affects</strong> 在元数据中声明目标。</span></p>
+            <p><span class="legend-mark legend-solid" aria-hidden="true"></span><span><strong>sync</strong> 读取 delta 并写入正式规范。</span></p>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="impact" class="impact-section" aria-labelledby="impact-title">
+      <div class="section-heading">
+        <h2 id="impact-title">一个 change 能改哪些地方？</h2>
+        <p>真实示例 <code>add-passkey-login</code> 的 <code>affects</code> 指向两份 spec。每份 spec 有一份 delta，里面可以声明多条 Contract 操作。</p>
+      </div>
+      <div class="impact-layout">
+        <div class="impact-tree">
+          <div class="impact-root"><span>change · feat</span><code>add-passkey-login</code></div>
+          <!-- 每个目标 spec 对应一份 delta，二级节点对应文件中的操作标题。 -->
+          <ul class="impact-branches">
+            <li>
+              <details open>
+                <summary><code>capability:user-auth</code><span>2 条操作</span></summary>
+                <a class="impact-delta" href="../example_specs/spec/changes/implemented/feat/add-passkey-login/deltas/capability/user-auth.md"><code>deltas/capability/user-auth.md</code></a>
+                <ul class="impact-operations">
+                  <li><span class="impact-action">MODIFIED</span><code>password-login</code></li>
+                  <li><span class="impact-action impact-add">ADDED</span><code>passkey-login</code></li>
+                </ul>
+              </details>
+            </li>
+            <li>
+              <details open>
+                <summary><code>component:auth-service</code><span>1 条操作</span></summary>
+                <a class="impact-delta" href="../example_specs/spec/changes/implemented/feat/add-passkey-login/deltas/component/auth-service.md"><code>deltas/component/auth-service.md</code></a>
+                <ul class="impact-operations">
+                  <li>
+                    <span class="impact-action">MODIFIED</span><code>credential-validation</code>
+                    <ul class="impact-body">
+                      <li>认证服务验证密码或通行密钥凭据，并返回认证结果。</li>
+                      <li>它不负责发送验证码或管理客户端密钥。</li>
+                    </ul>
+                  </li>
+                </ul>
+              </details>
+            </li>
+          </ul>
+        </div>
+        <aside class="impact-note" aria-labelledby="impact-item-title">
+          <h3 id="impact-item-title">只改 Contract 里的一个 item 呢？</h3>
+          <p>如果 item 指正文中的一条规则、列表项或场景，它和其他条目都属于同一个 Contract。只改其中一条时，写一段 <code>MODIFIED</code>，带上<strong>该 Contract 的完整新正文</strong>。图中末端的两句话由同一个 ID 定位。</p>
+          <p>如果两条规则各有自己的 Contract ID，就在同一份 delta 中各写一段操作。同步后，历史也按这些 ID 分开保存。</p>
+        </aside>
+      </div>
+    </section>
+
+    <section id="history" class="history-section" aria-labelledby="history-title">
+      <div class="section-heading">
+        <h2 id="history-title">跟踪一个 Contract</h2>
+        <p>这两个示例 Contract 都经过两次实际同步。选择版本可查看对应 change。</p>
+      </div>
+      <div class="history-layout">
+        <div class="contract-switch" aria-label="示例 Contract">
+          <button type="button" data-contract="expiry" aria-pressed="true"><span>能力 · 会话过期</span><code>capability:user-auth:session-expiry</code></button>
+          <button type="button" data-contract="issuance" aria-pressed="false"><span>组件 · 会话签发与过期</span><code>component:auth-service:session-issuance</code></button>
+        </div>
+        <div class="version-browser">
+          <aside class="version-sidebar" aria-label="版本列表">
+            <h3>版本<span>按新到旧</span></h3>
+            <ol id="version-list" class="version-list"></ol>
+          </aside>
+          <article class="version-detail" aria-labelledby="version-title">
+            <div class="version-header">
+              <span id="version-state"></span>
+              <time id="version-date"></time>
+            </div>
+            <div aria-live="polite">
+              <h3 id="version-title">会话过期</h3>
+              <p id="version-content"></p>
+            </div>
+            <div id="change-detail" class="change-detail">
+              <div>
+                <span id="change-state"></span>
+                <strong id="change-title"></strong>
+              </div>
+              <a id="change-link">打开归档 change</a>
+            </div>
+            <details id="comparison" class="comparison" hidden>
+              <summary>与上一版本对照</summary>
+              <div class="comparison-grid">
+                <div class="before"><strong id="before-label"></strong><p id="before-title"></p><p id="before-content"></p></div>
+                <div class="after"><strong id="after-label"></strong><p id="after-title"></p><p id="after-content"></p></div>
+              </div>
+            </details>
+          </article>
+        </div>
+      </div>
+      <noscript><p>启用浏览器 JavaScript 后可浏览版本。也可以直接查看 <a href="../example_specs/spec/">示例目录</a>。</p></noscript>
+    </section>
+
+    <section id="storage" class="storage-section" aria-labelledby="storage-title">
+      <div class="section-heading">
+        <h2 id="storage-title">文件存放在哪里</h2>
+        <p>目录表达结构与生命周期。每份文件负责不同的信息。</p>
+      </div>
+      <div class="storage-grid">
+        <div>
+          <h3>项目目录</h3>
+          <dl class="file-list">
+            <div><dt><a href="../example_specs/spec/config.yaml"><code>spec/config.yaml</code></a></dt><dd>声明允许使用的 spec type 和 change kind。</dd></div>
+            <div><dt><a href="../example_specs/spec/template/"><code>spec/template/</code></a></dt><dd><code>specTypes.*.template</code> 指定创建正式 spec 时使用的 Markdown 模板。</dd></div>
+            <div><dt><a href="../example_specs/spec/spec-index.md"><code>spec/spec-index.md</code></a></dt><dd>CLI 生成的当前规范索引，按 type 列出 spec。</dd></div>
+            <div><dt><code>spec/specs/&lt;type&gt;/&lt;spec-id&gt;/spec.md</code></dt><dd>正式规范正文，一份文件可声明多条当前生效的 Contract。</dd></div>
+            <div><dt><code>spec/changes/&lt;status&gt;/&lt;kind&gt;/&lt;change-id&gt;/</code></dt><dd>以状态和 kind 组织 change。归档目录名会加日期前缀。</dd></div>
+            <div><dt><a href="../example_specs/spec/changes/archived/manifest.json"><code>spec/changes/archived/manifest.json</code></a></dt><dd>记录归档文件的 SHA-256，便于校验封存内容。</dd></div>
+            <div><dt><code>spec/.history/contracts/&lt;type&gt;/&lt;spec-id&gt;/&lt;contract-id&gt;.jsonl</code></dt><dd>每条 Contract 的版本。删除后同 ID 再加入，继续沿用原文件和版本号。</dd></div>
+          </dl>
+        </div>
+        <div>
+          <h3>一个 change 的内容</h3>
+          <dl class="file-list">
+            <div><dt><code>meta-data.yaml</code></dt><dd>id、kind、目标 <code>affects</code> 或 <code>specImpact</code>、正文基线和同步回执。</dd></div>
+            <div><dt><code>change.md</code></dt><dd>解释问题和变更目的。</dd></div>
+            <div><dt><code>tasks.md</code></dt><dd>记录任务及完成情况。</dd></div>
+            <div><dt><code>deltas/&lt;type&gt;/&lt;spec-id&gt;.md</code></dt><dd>有规范影响时，每个目标 spec 对应一份 delta，可以改动其中多条 Contract。</dd></div>
+          </dl>
+        </div>
+      </div>
+    </section>
+
+    <section class="lifecycle-section" aria-labelledby="lifecycle-title">
+      <div class="section-heading">
+        <h2 id="lifecycle-title">change 的生命周期</h2>
+        <p>移动目录会改变 change 的状态。成功 sync 后，change 仍处于 implemented。</p>
+      </div>
+      <div class="lifecycle">
+        <ol class="lifecycle-main" aria-label="采纳后的状态">
+          <li><code>proposed</code><span>起草 change</span></li>
+          <li class="life-edge" aria-label="校验及完成任务后进入 implemented"><span>校验并完成任务</span></li>
+          <li><code>implemented</code><span>已完成，可以同步</span></li>
+          <li class="life-edge" aria-label="有 delta 时先成功同步再归档"><span>检查回执并归档</span></li>
+          <li><code>archived</code><span>保存材料和校验清单</span></li>
+        </ol>
+        <dl class="lifecycle-branches">
+          <div><dt><code>proposed → rejected</code></dt><dd>保留未采纳的理由，结束同步和归档流程。</dd></div>
+          <div><dt><code>specImpact.kind: none</code></dt><dd>适用于没有正式规范影响的 change。完成后可直接归档。</dd></div>
+        </dl>
+      </div>
+    </section>
+  </main>
+
+  <footer class="wrap footer">
+    <p>页面使用仓库示例快照，更新仓库后需重新导出页面数据。</p>
+    <a href="../example_specs/README.md">阅读示例说明</a>
+  </footer>
+</body>
+</html>

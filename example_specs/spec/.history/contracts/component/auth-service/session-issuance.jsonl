@@ -1,0 +1,3 @@
+{"idx": 1, "action": "add", "date": "2026-11-22 14:24:26+08:00", "changeId": null, "source": "backfill", "title": "会话签发职责", "content": "认证服务仅在凭据验证成功后签发会话，并设置会话过期时间。", "historyId": null}
+{"idx": 2, "action": "modify", "date": "2026-11-22 14:27:44+08:00", "changeId": "define-session-lifetime", "source": "sync", "title": "会话签发职责", "content": "认证服务仅在凭据验证成功后签发会话，并将会话过期时间设为签发时间加 30 分钟。", "historyId": "b84d3d11da89446cb5a14df630876a74"}
+{"idx": 3, "action": "modify", "date": "2026-11-22 14:28:01+08:00", "changeId": "expire-idle-sessions", "source": "sync", "title": "会话签发与过期职责", "content": "认证服务仅在凭据验证成功后签发会话。签发时设置 30 分钟的绝对有效期和 10 分钟的初始空闲期限。验证会话时，任一期限到达即拒绝请求；通过认证的请求只刷新空闲期限。", "historyId": "8ed5e6226f034e1394ea2569961c3887"}

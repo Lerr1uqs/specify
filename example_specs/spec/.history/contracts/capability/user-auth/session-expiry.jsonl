@@ -1,0 +1,3 @@
+{"idx": 1, "action": "add", "date": "2026-11-22 14:24:26+08:00", "changeId": null, "source": "backfill", "title": "会话过期", "content": "会话在过期时间到达后失效，后续请求必须重新认证。", "historyId": null}
+{"idx": 2, "action": "modify", "date": "2026-11-22 14:27:44+08:00", "changeId": "define-session-lifetime", "source": "sync", "title": "会话过期", "content": "会话自签发起最多有效 30 分钟。达到有效期后，后续请求必须重新认证。", "historyId": "b84d3d11da89446cb5a14df630876a74"}
+{"idx": 3, "action": "modify", "date": "2026-11-22 14:28:01+08:00", "changeId": "expire-idle-sessions", "source": "sync", "title": "会话过期", "content": "会话自签发起最多有效 30 分钟。自上次通过认证的请求起连续空闲满 10 分钟时，会话提前失效。尚未使用的会话从签发时开始计算空闲时间。会话失效后，后续请求必须重新认证。", "historyId": "8ed5e6226f034e1394ea2569961c3887"}

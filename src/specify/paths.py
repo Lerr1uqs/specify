@@ -25,6 +25,7 @@ class RepoPaths:
         self.specs = self.spec / "specs"
         self.templates = self.spec / "template"
         self.changes = self.spec / "changes"
+        self.contract_history = self.spec / ".history" / "contracts"
         self.index = self.spec / "spec-index.md"
 
     def require_config(self) -> Path:

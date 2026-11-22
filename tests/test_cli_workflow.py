@@ -1,7 +1,10 @@
+import csv
 import json
+from io import StringIO
 from pathlib import Path
 
 from click.testing import CliRunner, Result
+from pytest import MonkeyPatch
 
 from specify.cli import main
 
@@ -545,3 +548,209 @@ def test_post_sync_delta_edit_is_rejected_and_archive_does_not_replay(
     assert "回执已过期" in result.output
     assert spec.read_bytes() == before
     assert change_dir.is_dir()
+
+
+def implement_history_change(
+    runner: CliRunner, root: Path, change_id: str, operation: str, delta: str
+) -> None:
+    """为 capability:login 创建并实现一份历史用例 change。"""
+
+    result = invoke(
+        runner,
+        root,
+        "change",
+        "create",
+        "feat",
+        change_id,
+        "--affect",
+        f"capability:login:{operation}",
+    )
+    assert result.exit_code == 0, result.output
+    change_dir = root / "spec/changes/proposed/feat" / change_id
+    (change_dir / "deltas/capability/login.md").write_text(
+        f"# delta\n\n{delta}\n", encoding="utf-8"
+    )
+    if operation != "create":
+        result = invoke(runner, root, "change", "baseline", change_id)
+        assert result.exit_code == 0, result.output
+    complete_tasks(change_dir)
+    result = invoke(runner, root, "change", "implement", change_id)
+    assert result.exit_code == 0, result.output
+
+
+def test_contract_history_lifecycle_and_views(tmp_path: Path) -> None:
+    """验证回填、归档、删除后重开、CSV 编码和按版本比较。"""
+
+    runner = CliRunner()
+    initialize(runner, tmp_path)
+    reference = "capability:login:session"
+    write_spec(tmp_path, "capability", "login", "session", "会话", "初始正文。")
+    write_spec(tmp_path, "component", "login", "session", "组件会话", "组件正文。")
+    write_spec(tmp_path, "capability", "auth", "session", "认证会话", "认证正文。")
+    assert (
+        json.loads(invoke(runner, tmp_path, "history", reference).output)["status"]
+        == "empty"
+    )
+    backfill = invoke(runner, tmp_path, "history", "--backfill")
+    assert json.loads(backfill.output) == {"backfilled": 3}
+    assert json.loads(invoke(runner, tmp_path, "history", "--backfill").output) == {
+        "backfilled": 0
+    }
+    record = json.loads(invoke(runner, tmp_path, "history", reference).output)["record"]
+    assert (record["idx"], record["action"], record["source"], record["changeId"]) == (
+        1,
+        "add",
+        "backfill",
+        None,
+    )
+
+    # 标题与正文在同一次 sync 里变化，只生成一个 modify。
+    implement_history_change(
+        runner,
+        tmp_path,
+        "edit-session",
+        "modify",
+        "## [RENAMED] [session] 会话 -> 登录会话\n\n"
+        "## [MODIFIED] [session] 登录会话\n\n修改正文。",
+    )
+    assert (
+        json.loads(invoke(runner, tmp_path, "history", reference).output)["record"][
+            "idx"
+        ]
+        == 1
+    )
+    for command in ("sync", "sync", "archive"):
+        result = invoke(runner, tmp_path, "change", command, "edit-session")
+        assert result.exit_code == 0, result.output
+
+    implement_history_change(
+        runner,
+        tmp_path,
+        "drop-session",
+        "remove",
+        "## [REMOVED] [session] 登录会话\n\n**Reason**: 已停用。\n**Migration**: 等待重开。",
+    )
+    result = invoke(runner, tmp_path, "change", "sync", "drop-session")
+    assert result.exit_code == 0, result.output
+    assert (
+        json.loads(invoke(runner, tmp_path, "history", reference).output)["status"]
+        == "removed"
+    )
+    assert (
+        json.loads(
+            invoke(runner, tmp_path, "history", reference, "--limit", "2").output
+        )["records"]
+        == []
+    )
+
+    reopened_body = '重新开放，含有 "quoted", text。\n\n保留 Unicode 分隔符 A\u2028B。'
+    # Markdown 解析器将 Unicode 分隔符规范化为正式正文中的换行。
+    rendered_body = reopened_body.replace("\u2028", "\n")
+    implement_history_change(
+        runner,
+        tmp_path,
+        "restore-session",
+        "create",
+        f"## [ADDED] [session] 新会话\n\n{reopened_body}",
+    )
+    result = invoke(runner, tmp_path, "change", "sync", "restore-session")
+    assert result.exit_code == 0, result.output
+    latest = json.loads(invoke(runner, tmp_path, "history", reference).output)
+    assert (latest["status"], latest["record"]["idx"], latest["record"]["content"]) == (
+        "active",
+        4,
+        rendered_body,
+    )
+    recent = json.loads(
+        invoke(runner, tmp_path, "history", reference, "--limit", "5").output
+    )
+    assert [row["idx"] for row in recent["records"]] == [4]
+
+    exported = invoke(
+        runner, tmp_path, "history", reference, "--include-removed", "--csv"
+    )
+    rows = list(csv.DictReader(StringIO(exported.output)))
+    assert [(row["idx"], row["action"]) for row in rows] == [
+        ("1", "add"),
+        ("2", "modify"),
+        ("3", "remove"),
+        ("4", "add"),
+    ]
+    assert rows[-1]["content"] == rendered_body
+    expanded = json.loads(
+        invoke(
+            runner, tmp_path, "history", reference, "--include-removed", "--limit", "2"
+        ).output
+    )
+    assert [row["idx"] for row in expanded["records"]] == [3, 4]
+    diff = json.loads(
+        invoke(runner, tmp_path, "history", reference, "--diff", "2", "4").output
+    )["diff"]
+    assert "-## 登录会话" in diff and "+## 新会话" in diff
+
+    for flags in ((), ("--include-removed",), ("--diff", "2", "4")):
+        human = invoke(runner, tmp_path, "history", reference, *flags, "--human")
+        assert human.exit_code == 0, human.output
+        assert "新会话" in human.output and "\x1b[" not in human.output
+
+    # 人类视图从最新版本开始，包含删除记录时也按版本倒序展示。
+    timeline = invoke(
+        runner, tmp_path, "history", reference, "--include-removed", "--human"
+    )
+    assert timeline.exit_code == 0, timeline.output
+    assert (
+        timeline.output.index("#4")
+        < timeline.output.index("#3")
+        < timeline.output.index("#1")
+    )
+
+    # 同名 ID 不会串到其他 type 或同 type 下的其他 spec。
+    for ref, title in (
+        ("component:login:session", "组件会话"),
+        ("capability:auth:session", "认证会话"),
+    ):
+        result = json.loads(invoke(runner, tmp_path, "history", ref).output)["record"]
+        assert result["idx"] == 1 and result["title"] == title
+
+
+def test_contract_history_hides_failed_sync_and_preserves_initial_content(
+    tmp_path: Path, monkeypatch: MonkeyPatch
+) -> None:
+    """正式写入失败时隐藏暂存记录，重试只发布一条变更与一条起始记录。"""
+
+    runner = CliRunner()
+    initialize(runner, tmp_path)
+    write_spec(tmp_path, "capability", "login", "session", "会话", "旧正文。")
+    implement_history_change(
+        runner,
+        tmp_path,
+        "edit-session",
+        "modify",
+        "## [MODIFIED] [session] 会话\n\n新正文。",
+    )
+
+    def fail_spec_write(_path: Path, _content: str) -> None:
+        """模拟历史暂存完成后的正式文件写入失败。"""
+
+        raise OSError("write failed")
+
+    with monkeypatch.context() as patch:
+        patch.setattr("specify.sync.atomic_write", fail_spec_write)
+        assert invoke(runner, tmp_path, "change", "sync", "edit-session").exit_code == 3
+        reference = "capability:login:session"
+        result = invoke(runner, tmp_path, "history", reference)
+        assert json.loads(result.output)["status"] == "empty"
+
+    # 重试复用版本编号，下一次重复同步仍然不会追加。
+    for _ in range(2):
+        result = invoke(runner, tmp_path, "change", "sync", "edit-session")
+        assert result.exit_code == 0, result.output
+    path = tmp_path / "spec/.history/contracts/capability/login/session.jsonl"
+    rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+    assert [(row["idx"], row["action"], row["content"]) for row in rows] == [
+        (1, "add", "旧正文。"),
+        (2, "modify", "新正文。"),
+    ]
+    assert rows[0]["source"] == "backfill"
+    result = invoke(runner, tmp_path, "history", reference, "--limit", "5")
+    assert [row["idx"] for row in json.loads(result.output)["records"]] == [1, 2]

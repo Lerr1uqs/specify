@@ -1,0 +1,25 @@
+id: define-session-lifetime
+title: 明确会话最长有效期
+kind: feat
+createdAt: '2026-11-22T14:27:25+08:00'
+updatedAt: '2026-11-22T14:27:44+08:00'
+affects:
+- type: capability
+  id: user-auth
+  change: modify
+- type: component
+  id: auth-service
+  change: modify
+baseVersions:
+  capability:user-auth:session-expiry:
+    ae59d42d8f6210d219b33ace13d51d4b9cf30fe8ab8de16ddfd1a13b88b4073c
+  component:auth-service:session-issuance:
+    a7142a43ec46f4e2a3685aa1a1d777b58fb9afe96e4a4d2b71780bb60e29bef0
+sync:
+  appliedAt: '2026-11-22T14:27:44+08:00'
+  deltaHashes:
+    capability/user-auth.md:
+      f36edd013c6a64ccda3d01228223068bcd60560a170a5943b703abbb96826bfa
+    component/auth-service.md:
+      3010a944015a339d3d43508e3e98b04ace4218fe92dd46905f25f467f860fa8d
+  historyId: b84d3d11da89446cb5a14df630876a74
