@@ -104,11 +104,29 @@ specify history capability:user-auth:session-expiry
 specify history capability:user-auth:session-expiry --limit 5 --human
 specify history capability:user-auth:session-expiry --include-removed --csv > history.csv
 specify history capability:user-auth:session-expiry --diff 1 2 --human
+specify history --human
 ```
 
 默认以 JSON 返回当前生命周期的最新版本。`--limit` 查询最近几条记录，`--include-removed` 展开以前的生命周期和删除记录，`--diff` 按 `idx` 比较标题和正文，支持跨生命周期比较。用 `--human` 在终端浏览，用 `--csv` 导出记录。
 
 升级已有项目时运行 `specify history --backfill`，把还没有历史的 Contract 以当前正文补记为 `add`。补录日期为执行时的日期，同步时也会为首次被修改或删除的已有 Contract 自动补一条起始记录。
+
+在 POSIX 终端运行 `specify history --human` 可打开选择器。输入的字符按顺序在整条引用中匹配，可以在同一段内跳着选字，也可以跨段。例如 `touch`、`lts` 和 `kendtouch` 都能找到 `requirement:backend-indicators-signals:line-touch-signal`。列表用颜色区分引用的三段，并突出命中的字符。首屏只显示终端能容纳的条目，按方向键可以滚动，Enter 确认，Esc 取消。
+
+交互选中后默认显示最近 3 条。可在 `spec/config.yaml` 修改默认值，显式传入的 `--limit` 优先。
+
+```yaml
+history:
+  defaultLimit: 5
+```
+
+在 `~/.zshrc` 启用 Click 补全后，输入 `specify history --human rbl` 并按 Tab，即可补入匹配的完整引用。补全也支持全局 `--root`。
+
+```zsh
+autoload -Uz compinit
+compinit
+source <(_SPECIFY_COMPLETE=zsh_source specify)
+```
 
 ## 常用命令
 

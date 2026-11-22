@@ -13,14 +13,16 @@ from pathlib import Path
 from typing import Any
 
 import click
+from click.shell_completion import CompletionItem
 from rich.console import Console
 
 from .archive import archive_change, validate_archived
 from .baseline import capture_baselines
-from .config import dump_yaml, load_config
+from .config import DEFAULT_HISTORY_LIMIT, dump_yaml, load_config
 from .contract import ContractIdentity
 from .errors import EnvironmentError, ExitCode, SpecifyError, UsageError
 from .history import ContractHistory, active_history, diff_history
+from .history_picker import HistoryReferenceCatalog, choose_history_reference
 from .history_view import HistoryView, HumanHistory
 from .index import SpecIndex, build_index
 from .io import move_to_trash
@@ -576,8 +578,29 @@ def show_command(context: click.Context, reference: str) -> None:
         CommandOutput.fail(context, error)
 
 
+def history_reference_completion(
+    context: click.Context, _parameter: click.Parameter, incomplete: str
+) -> list[CompletionItem]:
+    """为 history 命令补全当前项目中匹配的完整 Contract 引用。"""
+
+    if not context.params.get("human"):
+        return []
+    root_context = context.find_root()
+    paths = RepoPaths(root_context.params["root"])
+    if not paths.config.is_file():
+        return []
+    # 补全和交互筛选使用同一组候选引用与匹配规则。
+    catalog = HistoryReferenceCatalog(paths, load_config(paths))
+    return [
+        CompletionItem(reference)
+        for reference, _ in catalog.search(catalog.references(), incomplete)
+    ]
+
+
 @main.command("history")
-@click.argument("reference", required=False)
+@click.argument(
+    "reference", required=False, shell_complete=history_reference_completion
+)
 @click.option("--limit", type=click.IntRange(min=1), help="显示最近 N 条操作。")
 @click.option("--include-removed", is_flag=True, help="展开已删除的生命周期。")
 @click.option(
@@ -587,7 +610,7 @@ def show_command(context: click.Context, reference: str) -> None:
     help="比较两个版本号。",
 )
 @click.option("--csv", "csv_output", is_flag=True, help="导出 CSV。")
-@click.option("--human", is_flag=True, help="使用 Rich 表格和 diff 展示。")
+@click.option("--human", is_flag=True, help="以表格或 diff 展示。省略引用时交互选择。")
 @click.option("--backfill", is_flag=True, help="为现有 Contract 添加初始历史快照。")
 @click.pass_context
 def history_command(
@@ -618,13 +641,31 @@ def history_command(
                 click.echo(json.dumps({"backfilled": count}))
             return
         if not reference:
-            raise UsageError("history 需要完整 Contract 引用或 --backfill")
+            if not human or reference is not None:
+                raise UsageError("history 需要完整 Contract 引用或 --backfill")
+            if not sys.stdin.isatty() or not sys.stdout.isatty():
+                raise UsageError("省略引用时使用 --human 需要可交互终端")
         if versions and (limit or include_removed or csv_output):
             raise UsageError(
                 "--diff 不能与 --limit、--include-removed 或 --csv 同时使用"
             )
 
-        store = ContractHistory(project_paths(context))
+        paths = project_paths(context)
+        if reference is None:
+            # 交互选择完成后沿用现有版本和时间线查询。
+            config = load_config(paths)
+            catalog = HistoryReferenceCatalog(paths, config)
+            reference = choose_history_reference(
+                catalog.references(), Console(file=sys.stdout)
+            )
+            if reference is None:
+                return
+            if versions is None and limit is None:
+                limit = config.get("history", {}).get(
+                    "defaultLimit", DEFAULT_HISTORY_LIMIT
+                )
+
+        store = ContractHistory(paths)
         records = store.read(store.parse_ref(reference))
         presenter = HumanHistory(Console(file=sys.stdout)) if human else None
 

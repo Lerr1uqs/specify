@@ -14,7 +14,9 @@ from .io import atomic_write
 from .paths import RepoPaths
 
 KEY_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-ALLOWED_TOP = {"specTypes", "kinds"}
+REQUIRED_SECTIONS = ("specTypes", "kinds")
+ALLOWED_TOP = {*REQUIRED_SECTIONS, "history"}
+DEFAULT_HISTORY_LIMIT = 3
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
@@ -36,7 +38,18 @@ def validate_config(data: dict[str, Any]) -> dict[str, Any]:
 
     unknown = set(data) - ALLOWED_TOP
     require(not unknown, f"配置包含未知字段：{', '.join(sorted(unknown))}")
-    for section in ALLOWED_TOP:
+    # history 是可选配置，校验时保留项目原有的 YAML 字段。
+    history = data.get("history", {})
+    require(isinstance(history, dict), "history 必须是映射")
+    unknown_history = sorted(str(key) for key in set(history) - {"defaultLimit"})
+    require(not unknown_history, f"history 有未知字段：{', '.join(unknown_history)}")
+    default_limit = history.get("defaultLimit", DEFAULT_HISTORY_LIMIT)
+    require(
+        type(default_limit) is int and default_limit > 0,
+        "history.defaultLimit 必须是正整数",
+    )
+
+    for section in REQUIRED_SECTIONS:
         values = data.get(section)
         require(isinstance(values, dict) and values, f"{section} 必须是非空映射")
         for key, value in values.items():

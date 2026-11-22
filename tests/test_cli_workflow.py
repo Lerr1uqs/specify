@@ -3,10 +3,14 @@ import json
 from io import StringIO
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner, Result
 from pytest import MonkeyPatch
 
 from specify.cli import main
+from specify.config import load_config, validate_config
+from specify.history_picker import HistoryReferenceCatalog
+from specify.paths import RepoPaths
 
 
 def invoke(runner: CliRunner, root: Path, *args: str) -> Result:
@@ -20,6 +24,80 @@ def initialize(runner: CliRunner, root: Path) -> None:
 
     result = runner.invoke(main, ["init", str(root)])
     assert result.exit_code == 0, result.output
+
+
+def test_history_picker_candidates_and_configured_default(tmp_path: Path) -> None:
+    """候选合并正式 Contract 与历史文件，搜索整条引用。"""
+
+    runner = CliRunner()
+    initialize(runner, tmp_path)
+    write_spec(
+        tmp_path,
+        "requirement",
+        "backend-indicators-signals",
+        "line-touch-signal",
+        "触线信号",
+        "正文",
+    )
+    write_spec(
+        tmp_path,
+        "requirement",
+        "billing-limits",
+        "line-limit",
+        "限流",
+        "正文",
+    )
+    paths = RepoPaths(tmp_path)
+    config = load_config(paths)
+    catalog = HistoryReferenceCatalog(paths, config)
+    reference = "requirement:backend-indicators-signals:line-touch-signal"
+    # 历史目录既可能保留已删除的引用，也可能包含仍存在的 Contract。
+    for contract_id in ("line-touch-signal", "retired-signal"):
+        snapshot = (
+            paths.contract_history
+            / "requirement"
+            / "backend-indicators-signals"
+            / f"{contract_id}.jsonl"
+        )
+        snapshot.parent.mkdir(parents=True, exist_ok=True)
+        snapshot.touch()
+    assert catalog.references() == [
+        "requirement:backend-indicators-signals:line-touch-signal",
+        "requirement:backend-indicators-signals:retired-signal",
+        "requirement:billing-limits:line-limit",
+    ]
+    assert len(catalog.search(catalog.references(), "rbl")) > 1
+    for query in ("LTS", "kendtouch", "requirement:backend", "touch"):
+        matches = dict(catalog.search(catalog.references(), query))
+        assert (
+            "".join(reference[index] for index in matches[reference]) == query.lower()
+        )
+    assert not catalog.search(catalog.references(), "touchbackend")
+
+    # 同一查询可以同时命中连续片段与隔开的字符，连续片段优先。
+    assert [
+        match for match, _ in catalog.search([reference, "rule:signals:lts"], "lts")
+    ] == ["rule:signals:lts", reference]
+
+    config_path = paths.config
+    source = config_path.read_text(encoding="utf-8")
+    config_path.write_text(source + "\nhistory:\n  defaultLimit: 5\n", encoding="utf-8")
+    assert load_config(paths)["history"]["defaultLimit"] == 5
+    assert "history" not in config
+
+
+def test_history_default_limit_must_be_positive_integer() -> None:
+    """拒绝布尔值、零和小数，确保 defaultLimit 符合正整数约定。"""
+
+    from specify.errors import SpecifyError
+
+    base = {
+        "specTypes": {"rule": {"label": "规则", "description": "说明"}},
+        "kinds": {"feat": {"label": "功能", "description": "说明"}},
+    }
+    for invalid in (True, 0, -1, 1.5):
+        with pytest.raises(SpecifyError):
+            validate_config({**base, "history": {"defaultLimit": invalid}})
 
 
 def write_spec(
