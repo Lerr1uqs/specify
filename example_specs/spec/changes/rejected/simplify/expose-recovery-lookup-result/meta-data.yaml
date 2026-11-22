@@ -1,0 +1,13 @@
+id: expose-recovery-lookup-result
+title: 直接显示恢复方式是否已绑定
+kind: simplify
+createdAt: '2026-11-22T15:49:34+08:00'
+updatedAt: '2026-11-22T15:50:25+08:00'
+affects:
+- type: capability
+  id: account-recovery
+  change: modify
+baseVersions:
+  capability:account-recovery:request-recovery:
+    6a240b2efc62107d9938e402f56cfbfd50e172743a84aa8a4b2666ea1dc75616
+rejectedReason: 该提案会暴露邮箱是否与账号关联。恢复页面保留统一受理提示。

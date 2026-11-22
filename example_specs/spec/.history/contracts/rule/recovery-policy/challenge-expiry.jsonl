@@ -1,0 +1,2 @@
+{"idx": 1, "action": "add", "date": "2026-11-22 15:49:26+08:00", "changeId": null, "source": "backfill", "title": "恢复凭证有效期", "content": "### 适用范围\n\n所有账号恢复入口及其发送的恢复通知。\n\n### 规则\n\n恢复凭证自签发起最多有效 15 分钟。成功完成密码重置后，同一凭证不得再次用于重置。", "historyId": null}
+{"idx": 2, "action": "modify", "date": "2026-11-22 15:50:16+08:00", "changeId": "publish-recovery-controls", "source": "sync", "title": "恢复凭证有效期", "content": "### 适用范围\n\n所有账号恢复入口及其发送的恢复通知。\n\n### 规则\n\n恢复凭证自签发起最多有效 10 分钟。成功完成密码重置后，同一凭证不得再次用于重置。", "historyId": "64f62b551e524ff9b963a16c6e4b6820"}

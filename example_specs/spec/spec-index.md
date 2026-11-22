@@ -2,6 +2,11 @@
 
 # Spec Index
 
+## Architecture
+
+- [`event-delivery`](specs/architecture/event-delivery/spec.md) — 通知事件从生产到投递的拓扑与依赖方向
+- [`identity-platform`](specs/architecture/identity-platform/spec.md) — 认证、账号恢复和通知组件的职责边界与数据流
+
 ## Capability
 
 - [`account-recovery`](specs/capability/account-recovery/spec.md) — 发起账号恢复、验证身份与重置密码
@@ -10,3 +15,14 @@
 ## Component
 
 - [`auth-service`](specs/component/auth-service/spec.md) — 凭据验证与会话签发、过期管理
+- [`notification-service`](specs/component/notification-service/spec.md) — 账号恢复通知的投递、重试与投递状态
+
+## Requirement
+
+- [`account-safety`](specs/requirement/account-safety/spec.md) — 账号恢复的可用性与身份验证要求
+- [`service-reliability`](specs/requirement/service-reliability/spec.md) — 通知投递的时效和失败反馈
+
+## Rule
+
+- [`audit-policy`](specs/rule/audit-policy/spec.md) — 身份与投递事件的审计字段及留存周期
+- [`recovery-policy`](specs/rule/recovery-policy/spec.md) — 恢复凭证的有效期和验证尝试约束

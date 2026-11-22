@@ -206,6 +206,10 @@ nav a:hover, nav a:focus-visible { color: var(--formal); text-decoration: underl
 .lifecycle-branches { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-top: 1.2rem; padding-top: .85rem; border-top: 1px solid var(--line); }
 .lifecycle-branches dt { font-weight: 750; }
 .lifecycle-branches dd { margin-top: .2rem; color: var(--muted); }
+.lifecycle-examples { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .6rem; margin-top: 1rem; }
+.lifecycle-examples > div { min-width: 0; padding: .55rem .65rem; border: 1px solid var(--line); border-radius: .35rem; }
+.lifecycle-examples dt { color: var(--change); font-weight: 700; overflow-wrap: anywhere; }
+.lifecycle-examples dd { margin-top: .15rem; }
 .footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem 1rem; margin-top: 3rem; padding: 1.25rem 0 1.8rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .875rem; }
 
 @media (max-width: 55rem) {
@@ -232,6 +236,7 @@ nav a:hover, nav a:focus-visible { color: var(--formal); text-decoration: underl
   .version-browser { grid-template-columns: minmax(0, 1fr); }
   .version-sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
   .comparison-grid, .storage-grid, .lifecycle-branches { grid-template-columns: minmax(0, 1fr); }
+  .lifecycle-examples { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .lifecycle-main { grid-template-columns: minmax(0, 1fr); }
   .life-edge { justify-items: start; padding-left: calc(50% + .65rem); padding-bottom: 0; }
   .life-edge::before { inset: 0 auto 0 50%; width: 2px; border: 0; background: #5f998d; }

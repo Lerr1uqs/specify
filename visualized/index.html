@@ -41,7 +41,7 @@
     <section id="structure" aria-labelledby="structure-title">
       <div class="section-heading">
         <h2 id="structure-title">正式规范树</h2>
-        <p>展开分支查看每份 spec 的 Contract。点选下方的 change，沿分色连线追到各份 delta 的目标 spec。</p>
+        <p>树展示当前生效的 Contract。点选下方的 change，沿分色连线查看它当时对各份 spec 做了什么。</p>
       </div>
       <dl class="structure-terms">
         <div><dt><code>type</code></dt><dd>规范的类别。一个 type 可包含多份 spec。</dd></div>
@@ -262,6 +262,13 @@
         <dl class="lifecycle-branches">
           <div><dt><code>proposed → rejected</code></dt><dd>保留未采纳的理由，结束同步和归档流程。</dd></div>
           <div><dt><code>specImpact.kind: none</code></dt><dd>适用于没有正式规范影响的 change。完成后可直接归档。</dd></div>
+        </dl>
+        <!-- 四种状态各链接到一份真实材料，归档示例使用 CLI 生成的日期目录。 -->
+        <dl class="lifecycle-examples">
+          <div><dt><code>proposed</code></dt><dd><a href="../example_specs/spec/changes/proposed/feat/show-recovery-delivery-state/change.md">显示恢复申请处理进度</a></dd></div>
+          <div><dt><code>implemented</code></dt><dd><a href="../example_specs/spec/changes/implemented/bugfix/restore-recovery-attempt-limits/change.md">恢复统一的验证次数规则</a></dd></div>
+          <div><dt><code>rejected</code></dt><dd><a href="../example_specs/spec/changes/rejected/simplify/expose-recovery-lookup-result/change.md">直接显示恢复方式是否已绑定</a></dd></div>
+          <div><dt><code>archived</code></dt><dd><a href="../example_specs/spec/changes/archived/arch/2026-11-22-publish-recovery-controls/change.md">统一账号恢复校验与通知</a></dd></div>
         </dl>
       </div>
     </section>

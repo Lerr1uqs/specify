@@ -90,6 +90,76 @@
       "kind": "feat",
       "path": "feat/2026-11-22-expire-idle-sessions/tasks.md",
       "sha256": "0ae746ef0293d30005d4a73d6be41fe7329cf2221e821c6eeb7503910200180f"
+    },
+    {
+      "archivedAt": "2026-11-22T15:50:16+08:00",
+      "id": "publish-recovery-controls",
+      "kind": "arch",
+      "path": "arch/2026-11-22-publish-recovery-controls/change.md",
+      "sha256": "32eda9f531ad3329fc97f995219f79e5f3356d7bacfc44a4db9f9ff327ea6fef"
+    },
+    {
+      "archivedAt": "2026-11-22T15:50:16+08:00",
+      "id": "publish-recovery-controls",
+      "kind": "arch",
+      "path": "arch/2026-11-22-publish-recovery-controls/deltas/architecture/identity-platform.md",
+      "sha256": "e2fdfe4e64910fb958a1b1aa7b119ebf44fc7a9a262a30c9605af9a52c76c50a"
+    },
+    {
+      "archivedAt": "2026-11-22T15:50:16+08:00",
+      "id": "publish-recovery-controls",
+      "kind": "arch",
+      "path": "arch/2026-11-22-publish-recovery-controls/deltas/component/notification-service.md",
+      "sha256": "3496fa6ee2d8a889d4e57613fb821df6f65aa0f81b16e9d4dbd5f28eb4375bc5"
+    },
+    {
+      "archivedAt": "2026-11-22T15:50:16+08:00",
+      "id": "publish-recovery-controls",
+      "kind": "arch",
+      "path": "arch/2026-11-22-publish-recovery-controls/deltas/requirement/account-safety.md",
+      "sha256": "e0d4a2098106169b6a775cf63973153b3b9e94294baa15839895c38411b78017"
+    },
+    {
+      "archivedAt": "2026-11-22T15:50:16+08:00",
+      "id": "publish-recovery-controls",
+      "kind": "arch",
+      "path": "arch/2026-11-22-publish-recovery-controls/deltas/rule/recovery-policy.md",
+      "sha256": "dfea29bae27b194c066658aa6ffb6b71aab4626205e453e7e71142bc41729317"
+    },
+    {
+      "archivedAt": "2026-11-22T15:50:16+08:00",
+      "id": "publish-recovery-controls",
+      "kind": "arch",
+      "path": "arch/2026-11-22-publish-recovery-controls/meta-data.yaml",
+      "sha256": "a7e6ac81466faf8cde3db51a816f38fa05fe8329bc4dd51e0285b8aeba844bdf"
+    },
+    {
+      "archivedAt": "2026-11-22T15:50:16+08:00",
+      "id": "publish-recovery-controls",
+      "kind": "arch",
+      "path": "arch/2026-11-22-publish-recovery-controls/tasks.md",
+      "sha256": "8d5fb0fd70f7b92ad5ff4b88e62b845f1016f8725645aea26863843162b32268"
+    },
+    {
+      "archivedAt": "2026-11-22T15:50:24+08:00",
+      "id": "cover-recovery-expiry",
+      "kind": "test",
+      "path": "test/2026-11-22-cover-recovery-expiry/change.md",
+      "sha256": "0af47ce7e17beb30b2e5a8b781f77825ded828ca0e38ac4e79598e5fbf6aeac8"
+    },
+    {
+      "archivedAt": "2026-11-22T15:50:24+08:00",
+      "id": "cover-recovery-expiry",
+      "kind": "test",
+      "path": "test/2026-11-22-cover-recovery-expiry/meta-data.yaml",
+      "sha256": "e828ec978cc91811eb767f59ac48148e45013a29b14761552180b76da034ad1e"
+    },
+    {
+      "archivedAt": "2026-11-22T15:50:24+08:00",
+      "id": "cover-recovery-expiry",
+      "kind": "test",
+      "path": "test/2026-11-22-cover-recovery-expiry/tasks.md",
+      "sha256": "1b26a1b4166c52ffa3af93c79e67013df99b4251838e21b05a4626d23d2e797f"
     }
   ],
   "version": 1

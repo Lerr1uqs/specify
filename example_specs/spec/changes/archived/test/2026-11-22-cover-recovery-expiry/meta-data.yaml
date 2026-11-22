@@ -1,0 +1,8 @@
+id: cover-recovery-expiry
+title: 补充恢复凭证过期验收样例
+kind: test
+createdAt: '2026-11-22T15:49:34+08:00'
+updatedAt: '2026-11-22T15:50:24+08:00'
+specImpact:
+  kind: none
+  reason: 仅补充现有规则的验收样例。

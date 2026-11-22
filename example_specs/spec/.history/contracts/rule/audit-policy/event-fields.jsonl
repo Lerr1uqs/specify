@@ -1,0 +1,1 @@
+{"idx": 1, "action": "add", "date": "2026-11-22 15:49:26+08:00", "changeId": null, "source": "backfill", "title": "审计事件字段", "content": "恢复申请、凭证验证和通知投递记录请求关联号、事件类型、发生时间和结果分类。事件不包含恢复凭证原文、通知正文或新密码。", "historyId": null}

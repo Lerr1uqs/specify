@@ -1,0 +1,1 @@
+{"idx": 1, "action": "add", "date": "2026-11-22 15:49:26+08:00", "changeId": null, "source": "backfill", "title": "临时投递失败重试", "content": "邮件服务报告临时错误时，通知服务在有效期内最多重试两次。地址无效和恢复凭证过期属于终止条件。每次重试沿用同一通知编号。", "historyId": null}

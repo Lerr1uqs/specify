@@ -1,0 +1,1 @@
+{"idx": 1, "action": "add", "date": "2026-11-22 15:49:26+08:00", "changeId": null, "source": "backfill", "title": "恢复通知时效", "content": "- **WHEN** 认证服务接受恢复请求并生成恢复凭证。\n- **THEN** 在凭证过期前，通知服务必须完成投递或记录明确的失败结果。", "historyId": null}

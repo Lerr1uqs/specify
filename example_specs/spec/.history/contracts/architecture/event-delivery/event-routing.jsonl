@@ -1,0 +1,1 @@
+{"idx": 1, "action": "add", "date": "2026-11-22 15:49:26+08:00", "changeId": null, "source": "backfill", "title": "恢复通知的事件路由", "content": "```text\n认证服务 → 通知任务 → 通知服务 → 邮件服务\n                  ← 投递结果 ← 通知服务\n```\n\n一条通知任务对应单次恢复通知。任务标识贯穿请求、重试和终态回执。", "historyId": null}

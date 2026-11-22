@@ -1,4 +1,4 @@
-/* 当前仓库的三份 spec 与明确标注的演示分支共用同一棵树。 */
+/* 快照取自 example_specs 的正式 spec 目录和三份实际 change 的 delta。 */
 "use strict";
 
 const structureTypes = [
@@ -8,19 +8,19 @@ const structureTypes = [
   ]},
   {id: "component", label: "模块职责", specs: [
     {id: "auth-service", contracts: ["credential-validation", "session-issuance"]},
-    {id: "notification-service", demo: true, contracts: ["delivery", "retry-policy"]},
+    {id: "notification-service", contracts: ["delivery", "retry-policy", "delivery-status"]},
   ]},
   {id: "requirement", label: "业务目标", specs: [
-    {id: "account-safety", demo: true, contracts: ["recover-access", "verify-identity"]},
-    {id: "service-reliability", demo: true, contracts: ["delivery-target", "failure-reporting"]},
+    {id: "account-safety", contracts: ["recover-access", "verify-identity"]},
+    {id: "service-reliability", contracts: ["delivery-target", "failure-reporting"]},
   ]},
   {id: "architecture", label: "系统结构", specs: [
-    {id: "identity-platform", demo: true, contracts: ["service-boundaries", "data-flow"]},
-    {id: "event-delivery", demo: true, contracts: ["event-routing", "dependency-direction"]},
+    {id: "identity-platform", contracts: ["service-boundaries", "data-flow"]},
+    {id: "event-delivery", contracts: ["event-routing", "dependency-direction"]},
   ]},
   {id: "rule", label: "跨规范约束", specs: [
-    {id: "recovery-policy", demo: true, contracts: ["challenge-expiry", "attempt-limits"]},
-    {id: "audit-policy", demo: true, contracts: ["event-fields", "retention"]},
+    {id: "recovery-policy", contracts: ["challenge-expiry", "attempt-limits"]},
+    {id: "audit-policy", contracts: ["event-fields", "retention"]},
   ]},
 ];
 
@@ -32,18 +32,18 @@ const structureActions = {
 };
 
 const structureChanges = [
-  {id: "add-passkey-login", label: "增加通行密钥登录", source: "真实", targets: {
+  {id: "add-passkey-login", label: "增加通行密钥登录", status: "已同步", targets: {
     "capability:user-auth": {"password-login": ["modify"], "passkey-login": ["add"]},
     "component:auth-service": {"credential-validation": ["modify"]},
   }},
-  {id: "expire-idle-sessions", label: "增加会话空闲超时", source: "真实", targets: {
+  {id: "expire-idle-sessions", label: "增加会话空闲超时", status: "已归档", targets: {
     "capability:user-auth": {"session-expiry": ["modify"]},
     "component:auth-service": {"session-issuance": ["rename", "modify"]},
   }},
-  {id: "publish-recovery-controls", label: "调整账号恢复约束", source: "演示", targets: {
-    "capability:account-recovery": {"request-recovery": ["modify"]},
+  {id: "publish-recovery-controls", label: "统一账号恢复校验与通知", status: "已归档", targets: {
+    "component:notification-service": {"delivery": ["modify"], "delivery-status": ["add"]},
     "requirement:account-safety": {"verify-identity": ["modify"]},
-    "architecture:identity-platform": {"data-flow": ["modify"]},
+    "architecture:identity-platform": {"data-flow": ["rename", "modify"]},
     "rule:recovery-policy": {"challenge-expiry": ["modify"], "attempt-limits": ["remove"]},
   }},
 ];
@@ -117,7 +117,7 @@ class SpecStructure {
       const button = structureElement("button", "structure-change-title");
       button.type = "button";
       button.setAttribute("aria-pressed", "false");
-      button.append(structureElement("strong", "", change.label), structureElement("code", "", change.id), structureElement("span", "structure-demo", change.source));
+      button.append(structureElement("strong", "", change.label), structureElement("code", "", change.id), structureElement("span", "structure-state", change.status));
       button.addEventListener("click", () => this.selectChange(change.id));
       const deltas = structureElement("ul", "structure-deltas");
       const edges = [];
@@ -172,10 +172,9 @@ class SpecStructure {
         const item = document.createElement("li");
         const file = document.createElement("details");
         // 每个 type 首屏都露出至少一份 spec 的 Contract ID。
-        file.open = !spec.demo || index === 0;
+        file.open = index === 0;
         const heading = structureElement("summary", "structure-spec-label");
         heading.append(structureElement("code", "", spec.id));
-        if (spec.demo) heading.append(structureElement("span", "structure-demo", "演示"));
         const list = structureElement("ul", "structure-contracts");
         const contracts = new Map();
         for (const id of spec.contracts) {

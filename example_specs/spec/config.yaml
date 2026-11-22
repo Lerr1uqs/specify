@@ -7,6 +7,18 @@ specTypes:
     label: 组件
     description: 模块职责、边界和依赖
     template: template/component.md
+  requirement:
+    label: 需求
+    description: 业务目标、触发条件和必须达到的结果
+    template: template/requirement.md
+  architecture:
+    label: 架构
+    description: 系统、子系统和组件的结构关系
+    template: template/architecture.md
+  rule:
+    label: 规则
+    description: 跨能力或组件适用的稳定约束
+    template: template/rule.md
 
 kinds:
   feat:
@@ -15,3 +27,15 @@ kinds:
   refactor:
     label: 重构
     description: 改善内部结构而不改变 Contract
+  bugfix:
+    label: 修复
+    description: 修复实现或正式 spec 的错误
+  simplify:
+    label: 简化
+    description: 降低复杂度而不增加能力
+  arch:
+    label: 架构
+    description: 调整组件边界、依赖或架构决策
+  test:
+    label: 测试
+    description: 补充或调整验证覆盖

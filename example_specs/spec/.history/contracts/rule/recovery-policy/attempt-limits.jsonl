@@ -1,0 +1,3 @@
+{"idx": 1, "action": "add", "date": "2026-11-22 15:49:26+08:00", "changeId": null, "source": "backfill", "title": "恢复验证次数限制", "content": "同一恢复凭证最多允许 5 次失败验证。达到上限后，用户须重新发起恢复，不能继续使用该凭证。", "historyId": null}
+{"idx": 2, "action": "remove", "date": "2026-11-22 15:50:16+08:00", "changeId": "publish-recovery-controls", "source": "sync", "title": "", "content": "", "historyId": "64f62b551e524ff9b963a16c6e4b6820"}
+{"idx": 3, "action": "add", "date": "2026-11-22 15:50:44+08:00", "changeId": "restore-recovery-attempt-limits", "source": "sync", "title": "跨入口共享恢复尝试次数", "content": "同一恢复凭证在所有恢复入口合计最多允许 5 次失败验证。切换网页或客户端不会重置剩余次数。达到上限后，用户须重新发起恢复，不能继续使用该凭证。", "historyId": "4ef3e647ae1b43e5b43dec96da43c0cd"}

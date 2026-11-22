@@ -1,0 +1,1 @@
+{"idx": 1, "action": "add", "date": "2026-11-22 15:49:26+08:00", "changeId": null, "source": "backfill", "title": "恢复账号访问", "content": "- **WHEN** 用户忘记密码且能访问已绑定的恢复方式。\n- **THEN** 用户可完成验证并设置新密码，随后使用新密码登录。", "historyId": null}

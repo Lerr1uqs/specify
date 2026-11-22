@@ -1,0 +1,2 @@
+{"idx": 1, "action": "add", "date": "2026-11-22 15:49:26+08:00", "changeId": null, "source": "backfill", "title": "恢复前验证身份", "content": "系统 **MUST** 确认用户持有当前有效的恢复凭证，再允许设置新密码。恢复页面对已绑定和未绑定的输入都返回相同的受理提示。", "historyId": null}
+{"idx": 2, "action": "modify", "date": "2026-11-22 15:50:16+08:00", "changeId": "publish-recovery-controls", "source": "sync", "title": "恢复前验证身份", "content": "系统 **MUST** 验证恢复凭证仍有效且未使用，再允许设置新密码。恢复页面对已绑定和未绑定的输入都返回相同的受理提示。邮件投递回执只表示投递状态。", "historyId": "64f62b551e524ff9b963a16c6e4b6820"}

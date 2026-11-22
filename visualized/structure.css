@@ -47,14 +47,14 @@
 .structure-specs > li, .structure-contract { margin-bottom: .45rem; }
 .structure-spec-label { position: relative; font-weight: 700; }
 .structure-spec-label::before { position: absolute; top: 50%; right: 100%; width: .6rem; border-top: 1px solid #acbddb; content: ""; }
-.structure-demo, .structure-operation {
+.structure-state, .structure-operation {
   display: inline-block;
   border-radius: .22rem;
   padding: .02rem .28rem;
   font-size: .73rem;
   font-weight: 700;
 }
-.structure-demo { margin-left: .32rem; background: #e6ebf5; color: #425579; }
+.structure-state { margin-left: .32rem; background: #e6ebf5; color: #425579; }
 .structure-contract {
   display: flex;
   flex-wrap: wrap;

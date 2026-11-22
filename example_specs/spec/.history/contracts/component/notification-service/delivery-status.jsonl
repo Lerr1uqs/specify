@@ -1,0 +1,1 @@
+{"idx": 1, "action": "add", "date": "2026-11-22 15:50:16+08:00", "changeId": "publish-recovery-controls", "source": "sync", "title": "投递状态回执", "content": "通知服务按通知编号向认证服务返回待投递、已投递或失败状态。回执不包含通知正文、目标地址或恢复凭证。", "historyId": "64f62b551e524ff9b963a16c6e4b6820"}

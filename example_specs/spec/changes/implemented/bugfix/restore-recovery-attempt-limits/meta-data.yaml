@@ -1,0 +1,15 @@
+id: restore-recovery-attempt-limits
+title: 恢复统一的验证次数规则
+kind: bugfix
+createdAt: '2026-11-22T15:50:25+08:00'
+updatedAt: '2026-11-22T15:50:44+08:00'
+affects:
+- type: rule
+  id: recovery-policy
+  change: modify
+sync:
+  appliedAt: '2026-11-22T15:50:44+08:00'
+  deltaHashes:
+    rule/recovery-policy.md:
+      4736a3cd6081de9a25b0bb52fcc607e72cbbdfbafaa00940691fa9feb20b2b5e
+  historyId: 4ef3e647ae1b43e5b43dec96da43c0cd

@@ -8,7 +8,24 @@ uv run specify --root example_specs list --spec --human
 uv run specify --root example_specs status --human
 ```
 
-第一条展示活跃 change 的 kind、状态和 tasks 进度。第二条用 Rich 树展示正式 spec，包括 `capability` 下的 `account-recovery` 和 `user-auth`。第三条同时展示正式 spec 和 change。`list --spec` 默认输出缩进文本。`list` 和 `status` 默认输出 JSON。
+第一条展示活跃 change 的状态、kind 和 tasks 进度。第二条展示五种正式 spec，包括用户能力、组件职责、业务需求、架构和规则。第三条同时展示正式 spec 和未归档 change，包含 rejected。`list --spec` 默认输出缩进文本。`list` 和 `status` 默认输出 JSON。
+
+## 四种 change 状态
+
+| 状态 | 示例 | 可以看到什么 |
+| --- | --- | --- |
+| `proposed` | `show-recovery-delivery-state` | 有目标 spec 和 delta，仍在提案阶段 |
+| `implemented` | `restore-recovery-attempt-limits` | 同步恢复曾删除的 Contract ID，保留旧历史 |
+| `rejected` | `expose-recovery-lookup-result` | 保存提案和未采纳的理由 |
+| `archived` | `publish-recovery-controls` | 多份 delta 跨 type 修改规范，归档清单保留文件校验值 |
+
+查看被删除后重新添加的 Contract，以及改标题并更新正文的版本差异：
+
+```bash
+uv run specify --root example_specs history rule:recovery-policy:attempt-limits --include-removed --csv
+uv run specify --root example_specs history component:auth-service:session-issuance --diff 2 3 --human
+uv run specify --root example_specs validate --archived
+```
 
 ## 目录内容
 

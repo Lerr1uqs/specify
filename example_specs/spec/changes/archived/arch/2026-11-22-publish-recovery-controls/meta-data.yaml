@@ -1,0 +1,41 @@
+id: publish-recovery-controls
+title: 统一账号恢复校验与通知
+kind: arch
+createdAt: '2026-11-22T15:49:34+08:00'
+updatedAt: '2026-11-22T15:50:16+08:00'
+affects:
+- type: component
+  id: notification-service
+  change: modify
+- type: requirement
+  id: account-safety
+  change: modify
+- type: architecture
+  id: identity-platform
+  change: modify
+- type: rule
+  id: recovery-policy
+  change: modify
+baseVersions:
+  architecture:identity-platform:data-flow:
+    83d72a5e832734b40ba463ce9a3129b88a8260a36ed4474a08b0d3c4d2097bda
+  component:notification-service:delivery:
+    b997f463939a2e59bb9300820d06b0dec24e8adc04d9dbfc907e681a6a05b683
+  requirement:account-safety:verify-identity:
+    3d5acaf41cf10c1ac607d27d2f80dd3b9ef2a466c040d911ade80b202d69d698
+  rule:recovery-policy:attempt-limits:
+    5546963c9f8a0fdaeee1b339a110c0e68886a83ed6995bc1f5925fddb5b9b807
+  rule:recovery-policy:challenge-expiry:
+    ff67c91fcd55a71f367106cebce77b473fb42f8fcc8b53af007d2b7119dd0250
+sync:
+  appliedAt: '2026-11-22T15:50:16+08:00'
+  deltaHashes:
+    architecture/identity-platform.md:
+      e2fdfe4e64910fb958a1b1aa7b119ebf44fc7a9a262a30c9605af9a52c76c50a
+    component/notification-service.md:
+      3496fa6ee2d8a889d4e57613fb821df6f65aa0f81b16e9d4dbd5f28eb4375bc5
+    requirement/account-safety.md:
+      e0d4a2098106169b6a775cf63973153b3b9e94294baa15839895c38411b78017
+    rule/recovery-policy.md:
+      dfea29bae27b194c066658aa6ffb6b71aab4626205e453e7e71142bc41729317
+  historyId: 64f62b551e524ff9b963a16c6e4b6820

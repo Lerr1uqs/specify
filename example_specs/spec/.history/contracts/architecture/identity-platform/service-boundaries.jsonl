@@ -1,0 +1,1 @@
+{"idx": 1, "action": "add", "date": "2026-11-22 15:49:26+08:00", "changeId": null, "source": "backfill", "title": "身份平台服务边界", "content": "```text\n身份平台\n├── 认证服务：登录、会话、恢复凭证和密码更新\n└── 通知服务：恢复通知的投递和重试\n```\n\n认证服务掌握账号凭据和认证结果。通知服务只处理投递所需的信息。", "historyId": null}

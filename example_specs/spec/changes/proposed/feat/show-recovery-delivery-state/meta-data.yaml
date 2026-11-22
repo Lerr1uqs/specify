@@ -1,0 +1,12 @@
+id: show-recovery-delivery-state
+title: 显示恢复申请处理进度
+kind: feat
+createdAt: '2026-11-22T15:49:34+08:00'
+updatedAt: '2026-11-22T15:50:25+08:00'
+affects:
+- type: capability
+  id: account-recovery
+  change: modify
+baseVersions:
+  capability:account-recovery:request-recovery:
+    6a240b2efc62107d9938e402f56cfbfd50e172743a84aa8a4b2666ea1dc75616

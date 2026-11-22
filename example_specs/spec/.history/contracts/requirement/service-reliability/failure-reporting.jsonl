@@ -1,0 +1,1 @@
+{"idx": 1, "action": "add", "date": "2026-11-22 15:49:26+08:00", "changeId": null, "source": "backfill", "title": "投递失败反馈", "content": "投递系统 **MUST** 向认证服务提供失败类别，以区分临时故障和永久失败。用户侧反馈应只说明是否可以稍后再试。", "historyId": null}
