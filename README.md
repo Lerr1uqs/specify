@@ -2,6 +2,8 @@
 
 Specify 是一个以 Markdown Contract 为正式规范、以 change 驱动迭代的命令行工具。项目配置、正式 spec 和 change 文件都保存在仓库目录中；不需要数据库或外部 JSON 状态库。
 
+[在线查看 Specify 项目图谱（GitHub Pages）](https://lerr1uqs.github.io/specify/visualized/index.html)。可以展开 spec 和 Contract，查看 change 如何通过 delta 更新规范，以及同步后的版本历史。
+
 ## 环境要求
 
 - Python 3.11 或更新版本
