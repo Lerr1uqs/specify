@@ -8,7 +8,7 @@ spec/spec-index.md
 
 ## 所有权
 
-该文件完全由 `specify index build` 生成，禁止手动编辑。
+该文件由 CLI 生成。用 `specify index build` 重建，创建或更新 spec 简介时也会刷新。
 
 ## 格式
 
@@ -19,7 +19,7 @@ spec/spec-index.md
 
 ## Capability
 
-- [`user-auth`](specs/capability/user-auth/spec.md)
+- [`user-auth`](specs/capability/user-auth/spec.md) — 登录、认证与会话管理
 
 ## Component
 
@@ -30,6 +30,6 @@ spec/spec-index.md
 
 - 只扫描 `specs/<type>/<spec-id>/spec.md`。
 - 分组标题为**首字母大写**的 type key（`capability` → `## Capability`），不是 `label`，也不是全小写的 key。
-- 每个条目只包含 spec-id 与正式 spec 的相对链接，不提取正文摘要。
+- 每个条目包含 spec-id 与正式 spec 的相对链接。有简介时读取 `spec.md` 同目录的 `meta-data.yaml` 中的 `description`。
 - 按 type、再按 spec-id 的稳定字典序排序。
 - 不收录 change、delta、rejected 或 archived 内容。

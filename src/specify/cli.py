@@ -7,6 +7,8 @@ import shutil
 import sys
 from collections.abc import Callable
 from datetime import datetime
+from itertools import groupby
+from operator import itemgetter
 from pathlib import Path
 from typing import Any
 
@@ -20,12 +22,13 @@ from .contract import ContractIdentity
 from .errors import EnvironmentError, ExitCode, SpecifyError, UsageError
 from .history import ContractHistory, active_history, diff_history
 from .history_view import HistoryView, HumanHistory
-from .index import build_index
+from .index import SpecIndex, build_index
 from .io import move_to_trash
 from .models import Change, Issue
 from .parse.spec import parse_spec_file
 from .paths import RepoPaths, find_change, validate_id
 from .scaffold import create_change, create_spec, initialize
+from .spec_metadata import SpecMetadata
 from .status import HumanStatus, ProjectStatus
 from .sync import sync_change
 from .validate.changes import read_metadata, validate_change, validate_changes
@@ -136,14 +139,50 @@ def init_command(context: click.Context, path: Path, config_path: Path | None) -
 @main.command("create")
 @click.argument("spec_type")
 @click.argument("spec_id")
+@click.option("--description", help="为 spec 设置一行索引简介。")
 @click.pass_context
-def create_command(context: click.Context, spec_type: str, spec_id: str) -> None:
+def create_command(
+    context: click.Context, spec_type: str, spec_id: str, description: str | None
+) -> None:
     """创建带显式 Contract ID 占位符的 formal spec。"""
 
     try:
         paths = project_paths(context)
-        target = create_spec(paths, load_config(paths), spec_type, spec_id)
+        config = load_config(paths)
+        target = create_spec(paths, config, spec_type, spec_id, description)
+        if description is not None:
+            # 创建时立即显示简介，即使模板正文还需要作者填充。
+            SpecIndex(paths, config).refresh()
         CommandOutput.emit(context, f"已创建 {target}")
+    except SpecifyError as error:
+        CommandOutput.fail(context, error)
+
+
+@main.command("update")
+@click.argument("reference")
+@click.option("--description", required=True, help="更新 spec 的索引简介。")
+@click.pass_context
+def update_command(context: click.Context, reference: str, description: str) -> None:
+    """更新已有 formal spec 的编目简介，并刷新索引。"""
+
+    try:
+        parts = reference.split(":")
+        if len(parts) != 2 or not validate_id(parts[1]):
+            raise UsageError("update 参数必须是 <type>:<spec-id>")
+        spec_type, spec_id = parts
+        paths = project_paths(context)
+        config = load_config(paths)
+        if spec_type not in config["specTypes"]:
+            raise UsageError(f"未知 spec type：{spec_type}")
+        target = paths.specs / spec_type / spec_id / "spec.md"
+        if not target.is_file():
+            raise EnvironmentError(f"找不到 spec：{reference}", str(target))
+
+        # 简介独立于 Contract 正文，不需要走 delta 和 sync。
+        value = SpecMetadata.normalize_description(description)
+        SpecMetadata(target).write_description(value)
+        SpecIndex(paths, config).refresh()
+        CommandOutput.emit(context, f"已更新 {reference} 的简介")
     except SpecifyError as error:
         CommandOutput.fail(context, error)
 
@@ -418,7 +457,7 @@ def validate_command(
     "--change", "list_changes", is_flag=True, help="列出活跃 change（默认）。"
 )
 @click.option("--spec", "list_formal_specs", is_flag=True, help="列出正式 spec。")
-@click.option("--human", is_flag=True, help="用表格展示列表。")
+@click.option("--human", is_flag=True, help="用 Rich 展示列表。")
 @click.pass_context
 def list_command(
     context: click.Context,
@@ -427,7 +466,7 @@ def list_command(
     list_formal_specs: bool,
     human: bool,
 ) -> None:
-    """默认以 JSON 列出活跃 change，并按选项切换正式 spec 与人类表格。"""
+    """以 JSON 列出活跃 change，或以缩进文本列出正式 spec。"""
 
     try:
         if human and context.obj["json"]:
@@ -449,10 +488,18 @@ def list_command(
             ]
             if human:
                 HumanStatus(Console(file=sys.stdout)).specs(items)
-            else:
+            elif context.obj["json"]:
                 click.echo(
                     json.dumps({"specs": items}, ensure_ascii=False, sort_keys=True)
                 )
+            else:
+                # 缩进表达归属，简介前保留相对项目根的可读路径。
+                for item_type, group in groupby(items, key=itemgetter("type")):
+                    click.echo(item_type)
+                    for item in group:
+                        description = item["description"]
+                        suffix = f"  {description}" if description else ""
+                        click.echo(f"  {item['id']}  {item['path']}{suffix}")
         else:
             items = [
                 item
@@ -470,7 +517,7 @@ def list_command(
 
 
 @main.command("status")
-@click.option("--human", is_flag=True, help="用表格展示正式 spec 和 change 状态。")
+@click.option("--human", is_flag=True, help="用 Rich 展示正式 spec 和 change 状态。")
 @click.pass_context
 def status_command(context: click.Context, human: bool) -> None:
     """查询项目状态；默认输出 JSON，Rich 展示需显式指定。"""

@@ -20,23 +20,19 @@ specify --help
 
 ### 安装 AI 工作流 skill
 
-使用 Node.js 22.20 或更新版本。在要使用 Specify 的项目中，先用这条命令安装完整流程参考 skill：
+使用 Node.js 22.20 或更新版本。在要使用 Specify 的项目中，一次安装全部工作流 skill：
+
+```bash
+npx skills add Lerr1uqs/specify --skill '*'
+```
+
+这会安装探索、提案、实施和归档四个专用 skill，以及 `specify-workflow` CLI 参考。只想查阅 CLI 用法时，可以单独安装参考 skill：
 
 ```bash
 npx skills add Lerr1uqs/specify --skill specify-workflow
 ```
 
-需要探索、提案、实施和归档四个专用 skill 时，安装它们：
-
-```bash
-npx skills add Lerr1uqs/specify \
-  --skill specify-explore \
-  --skill specify-propose \
-  --skill specify-apply-change \
-  --skill specify-archive-change
-```
-
-四个阶段 skill 分别负责探索、起草、实施和同步归档；`specify-workflow` 提供完整 CLI 流程参考。可只安装需要的 skill。它们只提供 agent 操作指引；Specify CLI 仍需按上面的步骤安装。
+只给 Codex 安装时，在命令末尾加 `--agent codex`。这些 skill 提供 agent 操作指引，Specify CLI 的安装见上文。
 
 阶段划分借鉴了 [OpenSpec 的开源 skills](https://github.com/Fission-AI/OpenSpec/tree/main/skills)；具体步骤按 Specify 的 Contract、基线、tasks 和同步回执协议编写。
 
@@ -60,6 +56,14 @@ specify create requirement password-login
 命令会把配置引用的模板复制到 `spec/specs/<type>/<id>/spec.md`。需求模板示范 `WHEN / THEN / MUST / SHOULD / MAY` 等表述，组件模板介绍职责、边界和依赖，架构模板提供树形结构示例。模板提供写作指引；`validate` 检查 Markdown 与 Contract 结构，不会自动判定业务语义是否完整。
 
 Contract 标题格式为 `## [<contract-id>] <标题>`。方括号中的 kebab-case ID 是稳定标识；类型、spec ID 和 Contract ID 组合成完整引用，例如 `capability:user-auth:password-login`。
+
+创建和更新 spec 时可以设置一行简介。简介保存在 `spec.md` 同级的 `meta-data.yaml`，命令会同步刷新 `spec/spec-index.md`。`list --spec` 默认用缩进文本按 type 展示 ID、相对项目根的路径和简介，`--human` 切换为 Rich 树，`specify --json list --spec` 返回完整字段。
+
+```bash
+specify create capability user-auth --description "登录、认证与会话管理"
+specify update capability:user-auth --description "密码登录、通行密钥与会话过期"
+specify --root ./my-project list --spec --human
+```
 
 ## Change 工作流
 
@@ -116,7 +120,7 @@ specify show capability:user-auth
 specify index build
 ```
 
-`list` 默认输出活跃 change 的 JSON，包括 kind、生命周期状态和 tasks 的已完成/总数；`list --human` 用表格显示这些进度。`list --change` 显式选择 change，`list --spec` 改为列出正式 spec，`--type` 仅与 `--spec` 搭配。`status` 默认输出整个项目的 JSON，`status --human` 同时显示 spec 和 change。`--human` 与全局 `--json` 互斥。`validate` 可用 `--specs`、`--changes` 或 `--archived` 限定检查范围。
+`list` 默认输出活跃 change 的 JSON，包括 kind、生命周期状态和 tasks 的已完成/总数。`list --human` 用表格显示这些进度。`list --change` 显式选择 change，`list --spec` 用缩进文本列出正式 spec，`--type` 仅与 `--spec` 搭配。`status` 默认输出整个项目的 JSON，`status --human` 同时显示 spec 和 change。`--human` 与全局 `--json` 互斥。`validate` 可用 `--specs`、`--changes` 或 `--archived` 限定检查范围。
 
 查看本仓库示例项目：
 

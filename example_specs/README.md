@@ -8,7 +8,7 @@ uv run specify --root example_specs list --spec --human
 uv run specify --root example_specs status --human
 ```
 
-第一条展示活跃 change 的 kind、状态和 tasks 进度；第二条展示正式 spec；第三条展示两者。默认 `list` 和 `status` 输出 JSON，只有显式指定 `--human` 才使用表格。
+第一条展示活跃 change 的 kind、状态和 tasks 进度。第二条用 Rich 树展示正式 spec，包括 `capability` 下的 `account-recovery` 和 `user-auth`。第三条同时展示正式 spec 和 change。`list --spec` 默认输出缩进文本。`list` 和 `status` 默认输出 JSON。
 
 ## 目录内容
 
@@ -18,7 +18,7 @@ uv run specify --root example_specs status --human
 - `spec/changes/implemented/feat/add-passkey-login/`：已完成并成功同步的 change，包含合并后的 `change.md`、tasks、metadata、正文基线、delta 和 sync 回执。
 - `spec/changes/archived/refactor/2026-11-15-reorganize-auth-files/`：一个无 spec 影响的归档 change。
 - `spec/changes/archived/manifest.json`：归档文件的 SHA-256 清单。
-- `spec/spec-index.md`：由 type 和 spec ID 构成的导航索引。
+- `spec/spec-index.md`：按 type 分组的导航索引，包含 spec ID、链接和简介。
 
 `add-passkey-login` 的 delta 已反映在 `spec/specs/` 中。它仍留在 `implemented/`，因为设计要求先 sync，archive 只核对回执并移动目录，不再次应用 delta。
 

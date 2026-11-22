@@ -4,8 +4,9 @@
 
 ## Capability
 
-- [`user-auth`](specs/capability/user-auth/spec.md)
+- [`account-recovery`](specs/capability/account-recovery/spec.md) — 发起账号恢复、验证身份与重置密码
+- [`user-auth`](specs/capability/user-auth/spec.md) — 密码登录、通行密钥与会话过期
 
 ## Component
 
-- [`auth-service`](specs/component/auth-service/spec.md)
+- [`auth-service`](specs/component/auth-service/spec.md) — 凭据验证与会话签发、过期管理

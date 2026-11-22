@@ -5,6 +5,8 @@ description: 查询 Specify CLI 命令和完整 Contract/change 生命周期时�
 
 # Specify 工作流
 
+如果还不熟悉这个项目，先在项目根运行 `specify list --spec` 查看全部正式 spec。用输出中的 type、相对路径和简介定位相关 spec，再读取正文。
+
 Specify 项目以 `spec/config.yaml` 为入口。正式规范在 `spec/specs/<type>/<id>/spec.md`，change 在 `spec/changes/`。命令默认作用于当前目录，也可在命令前加 `--root <项目目录>`。以下示例假设 `specify` 已安装；从本仓库源码运行时，用 `uv run specify` 替换。
 
 ## 查看与创建
@@ -25,6 +27,6 @@ Specify 项目以 `spec/config.yaml` 为入口。正式规范在 `spec/specs/<ty
 
 ## 当前 CLI 的输出边界
 
-全局 `--json` 放在子命令前，例如 `specify --json list`、`specify --json change verify <change-id>`。`list` 默认输出活跃 change 的 JSON，`list --human` 展示任务进度表；`list --spec` 切换为正式 spec，`--type` 只用于这个视图。`status` 默认输出整个项目的 JSON，`status --human` 同时展示 spec 和 change。`--human` 与 `--json` 互斥。`change status <change-id>` 只查询单个 change；目前没有重叠 change 的预检命令。
+全局 `--json` 放在子命令前，例如 `specify --json list --spec`、`specify --json change verify <change-id>`。`list` 默认输出活跃 change 的 JSON，`list --human` 展示任务进度表。`list --spec` 用缩进文本列出正式 spec 的 ID、相对项目根的路径和简介，`--type` 只用于这个视图。`status` 默认输出整个项目的 JSON，`status --human` 同时展示 spec 和 change。`--human` 与 `--json` 互斥。`change status <change-id>` 只查询单个 change；目前没有重叠 change 的预检命令。
 
 当前校验按 Contract 正文 hash 检测已捕获基线的变化。两个 change 修改同一个 spec 中不同的 Contract 时，只要各自依赖的 Contract 正文没有变化，verify 不会因为它们共享 spec 而拒绝。语义是否冲突仍需根据最新规范判断。

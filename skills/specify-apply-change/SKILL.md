@@ -5,6 +5,8 @@ description: 实施 Specify proposed change 中的 tasks，并在开始实施前
 
 # 实施 Specify change
 
+如果还不熟悉这个项目，先运行 `specify list --spec` 查看全部正式 spec，再用相对路径和简介定位相关正文。
+
 根据用户给出的 ID 或上下文定位 `spec/changes/proposed/<kind>/<change-id>/`。若有多个可能目标且无法判断，先列出候选 change 并请用户选择。读取 `change.md`、`tasks.md`、`meta-data.yaml`、所有 delta 与相关 formal spec。命令默认作用于当前目录；在本仓库源码中可用 `uv run specify` 替代 `specify`。
 
 **每次开始实施前**运行 `specify change verify <change-id>`。若报告 Contract 正文基线变化，先阅读最新 formal spec，重新审查 change 的目标和 delta，按新正文调整 delta，再显式运行 `specify change baseline <change-id>` 和 `specify change verify <change-id>`。不要只重捕 hash 来消除错误；必要时同步调整 tasks 和已经写好的实现。

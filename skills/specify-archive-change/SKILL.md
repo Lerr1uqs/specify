@@ -5,6 +5,8 @@ description: 完成 Specify implemented change 的同步与归档。适用于用
 
 # 同步并归档 Specify change
 
+如果还不熟悉这个项目，先运行 `specify list --spec` 查看全部正式 spec，再用相对路径和简介定位相关正文。
+
 根据用户给出的 ID 或上下文定位 implemented change；目标不明确时先查看 `spec/changes/implemented/` 并确认目标。读取 `change.md`、`tasks.md`、`meta-data.yaml`、delta 与受影响的 formal spec。命令默认作用于当前目录；在本仓库源码中可用 `uv run specify` 替代 `specify`。
 
 1. 确认 tasks 已完成，运行 `specify change verify <change-id>`。若基线变化，先按最新 Contract 审查并调整 delta，必要时同步修正实现，再显式运行 `specify change baseline <change-id>` 和 verify。不要只刷新基线 hash。

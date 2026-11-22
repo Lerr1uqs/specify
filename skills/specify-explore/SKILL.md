@@ -5,7 +5,7 @@ description: 在 Specify 项目中探索需求、Contract 边界和 change 方�
 
 # 探索 Specify 变更
 
-先确认项目存在 `spec/config.yaml`，读取其中的 `specTypes`、`kinds` 和相关模板。根据讨论主题查看 `specify list --spec`、`specify show <type>:<id>`、相关 formal spec，以及现有 change 的 `change.md`、`meta-data.yaml` 和 delta。命令默认作用于当前目录；在本仓库源码中可用 `uv run specify` 替代 `specify`。
+确认目标是已初始化的 Specify 项目。如果还不熟悉它，先运行 `specify list --spec` 查看全部正式 spec，再根据相对路径和简介定位相关正文。根据讨论主题读取 `spec/config.yaml`、相关模板和 change 材料。命令默认作用于当前目录；在本仓库源码中可用 `uv run specify` 替代 `specify`。
 
 帮助用户弄清问题、受影响的 Contract、可观察结果和实现约束。区分“修改正式 Contract”和“仅修复实现”：后者可以使用不带 `--affect` 的 change。若多个 change 涉及同一 spec，重点检查它们实际操作的 Contract ID 与正文，而不是仅凭 spec 路径判定冲突。
 

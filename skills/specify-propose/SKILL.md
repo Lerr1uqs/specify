@@ -5,6 +5,8 @@ description: 根据需求在 Specify 项目中创建并写好 proposed change，
 
 # 起草 Specify change
 
+如果还不熟悉这个项目，先运行 `specify list --spec` 查看全部正式 spec，再用相对路径和简介定位相关正文。
+
 先读取 `spec/config.yaml`、目标 formal spec 和相关模板，确认 change kind、kebab-case ID，以及每个目标的 `<type>:<spec-id>:<create|modify|remove>` 操作。命令默认作用于当前目录；在本仓库源码中可用 `uv run specify` 替代 `specify`。
 
 1. 用 `specify change create <kind> <change-id> --affect <type>:<spec-id>:<operation>` 建立骨架；多个目标重复传入 `--affect`。若不改变正式 Contract，省略 `--affect`，并在 `meta-data.yaml` 的 `specImpact.reason` 解释原因。

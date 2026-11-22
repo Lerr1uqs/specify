@@ -10,6 +10,7 @@ from .config import dump_yaml, load_yaml, validate_config
 from .errors import SpecifyError, require
 from .io import atomic_write
 from .paths import RepoPaths, scan_changes, validate_id
+from .spec_metadata import SpecMetadata
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "specTypes": {
@@ -72,15 +73,21 @@ def initialize(root: Path, config_path: Path | None) -> RepoPaths:
 
 
 def create_spec(
-    paths: RepoPaths, config: dict[str, Any], spec_type: str, spec_id: str
+    paths: RepoPaths,
+    config: dict[str, Any],
+    spec_type: str,
+    spec_id: str,
+    description: str | None = None,
 ) -> Path:
-    """创建带显式 ID 占位符的正式 spec 骨架。"""
+    """创建带显式 ID 占位符的正式 spec 骨架和可选简介。"""
 
     require(spec_type in config["specTypes"], f"未知 spec type：{spec_type}")
     require(validate_id(spec_id), f"spec id 必须为 kebab-case：{spec_id}")
     target = paths.specs / spec_type / spec_id / "spec.md"
     if target.exists():
         raise SpecifyError(f"spec 已存在：{spec_type}:{spec_id}")
+    if description is not None:
+        description = SpecMetadata.normalize_description(description)
     template_reference = config["specTypes"][spec_type].get("template")
     if template_reference:
         template_path = paths.spec / template_reference
@@ -95,6 +102,8 @@ def create_spec(
             "<!-- 填写该 Contract 的完整行为约定。 -->\n"
         )
     atomic_write(target, template)
+    if description is not None:
+        SpecMetadata(target).write_description(description)
     return target
 
 

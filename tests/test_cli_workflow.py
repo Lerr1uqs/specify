@@ -72,16 +72,27 @@ def test_list_switches_between_change_progress_and_formal_specs(
     assert "\x1b[" not in human_list.output
 
     specs = invoke(runner, tmp_path, "list", "--spec")
-    assert json.loads(specs.output)["specs"][0]["id"] == "auth"
+    assert specs.exit_code == 0, specs.output
+    assert specs.output == "capability\n  auth  spec/specs/capability/auth/spec.md\n"
     human_specs = invoke(runner, tmp_path, "list", "--spec", "--human")
     assert "capability" in human_specs.output and "valid" in human_specs.output
+    # 支持颜色的终端会用 ANSI 样式展示类型和校验状态。
+    colored_specs = runner.invoke(
+        main,
+        ["--root", str(tmp_path), "list", "--spec", "--human"],
+        env={"FORCE_COLOR": "1", "NO_COLOR": None},
+        color=True,
+    )
+    assert colored_specs.exit_code == 0, colored_specs.output
+    assert "\x1b[1;36mcapability\x1b[0m" in colored_specs.output
+    assert "\x1b[32mvalid" in colored_specs.output
     assert invoke(runner, tmp_path, "list", "--change", "--spec").exit_code == 2
     assert invoke(runner, tmp_path, "list", "--type", "capability").exit_code == 2
     assert (
         len(
             json.loads(
                 invoke(
-                    runner, tmp_path, "list", "--spec", "--type", "capability"
+                    runner, tmp_path, "--json", "list", "--spec", "--type", "capability"
                 ).output
             )["specs"]
         )
@@ -102,6 +113,72 @@ def test_list_switches_between_change_progress_and_formal_specs(
         conflict = invoke(runner, tmp_path, "--json", command, "--human")
         assert conflict.exit_code == 2
         assert "不能同时使用" in conflict.output
+
+
+def test_spec_description_updates_index_and_rich_list(tmp_path: Path) -> None:
+    """从指定项目根创建和更新简介，并在索引和两种列表中读取。"""
+
+    runner = CliRunner()
+    initialize(runner, tmp_path)
+    write_spec(tmp_path, "component", "legacy", "api", "接口", "提供接口。")
+    created = invoke(
+        runner, tmp_path, "create", "capability", "login", "--description", "登录认证"
+    )
+    assert created.exit_code == 0, created.output
+    index = tmp_path / "spec/spec-index.md"
+    spec_path = tmp_path / "spec/specs/capability/login/spec.md"
+    original = spec_path.read_bytes()
+    assert "[`login`](specs/capability/login/spec.md) — 登录认证" in index.read_text(
+        encoding="utf-8"
+    )
+
+    # 不改正文即可更新索引，带 Markdown 或 Rich 标记的描述按普通文本显示。
+    updated = invoke(
+        runner,
+        tmp_path,
+        "update",
+        "capability:login",
+        "--description",
+        "会话 [规则] & 登录",
+    )
+    assert updated.exit_code == 0, updated.output
+    assert spec_path.read_bytes() == original
+    assert "会话 \\[规则\\] &amp; 登录" in index.read_text(encoding="utf-8")
+    plain = invoke(runner, tmp_path, "list", "--spec")
+    assert plain.exit_code == 0, plain.output
+    assert (
+        plain.output
+        == "capability\n  login  spec/specs/capability/login/spec.md  会话 [规则] & 登录\n"
+        "component\n  legacy  spec/specs/component/legacy/spec.md\n"
+    )
+    listed = invoke(runner, tmp_path, "--json", "list", "--spec")
+    assert listed.exit_code == 0, listed.output
+    assert (
+        json.loads(listed.output)["specs"][0]["path"]
+        == "spec/specs/capability/login/spec.md"
+    )
+    assert [item["description"] for item in json.loads(listed.output)["specs"]] == [
+        "会话 [规则] & 登录",
+        None,
+    ]
+    rich = invoke(runner, tmp_path, "list", "--spec", "--human")
+    assert rich.exit_code == 0, rich.output
+    assert "会话 [规则] & 登录" in rich.output
+    assert "spec/specs/" not in rich.output
+
+    # 同一 type 下的多个 spec 作为同级节点，类型名称只出现一次。
+    write_spec(tmp_path, "capability", "signup", "signup", "注册", "允许注册。")
+    grouped = invoke(
+        runner, tmp_path, "list", "--spec", "--type", "capability", "--human"
+    )
+    assert grouped.exit_code == 0, grouped.output
+    assert grouped.output.count("capability") == 1
+    assert "├── login" in grouped.output and "└── signup" in grouped.output
+    spec_lines = [line for line in grouped.output.splitlines() if "valid" in line]
+    assert spec_lines[0].index("valid") == spec_lines[1].index("valid")
+    rebuilt = invoke(runner, tmp_path, "index", "build")
+    assert rebuilt.exit_code == 0, rebuilt.output
+    assert "会话 \\[规则\\] &amp; 登录" in index.read_text(encoding="utf-8")
 
 
 def test_init_preserves_customized_templates(tmp_path: Path) -> None:
@@ -207,9 +284,9 @@ def test_cli_actions_and_no_impact_lifecycle(tmp_path: Path) -> None:
     assert invoke(runner, tmp_path, "index", "build").exit_code == 0
     assert any(
         item["type"] == "capability" and item["id"] == "auth"
-        for item in json.loads(invoke(runner, tmp_path, "list", "--spec").output)[
-            "specs"
-        ]
+        for item in json.loads(
+            invoke(runner, tmp_path, "--json", "list", "--spec").output
+        )["specs"]
     )
     shown = invoke(runner, tmp_path, "--json", "show", "capability:auth")
     assert shown.exit_code == 0

@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
+from itertools import cycle, groupby
+from operator import itemgetter
 from pathlib import Path
 from typing import Any
 
 from rich.console import Console
 from rich.table import Table
+from rich.text import Text
+from rich.tree import Tree
 
 from .config import load_config
 from .errors import SpecifyError
 from .index import list_specs
+from .models import Issue
 from .parse.tasks import parse_tasks_file
 from .paths import RepoPaths, scan_changes
+from .spec_metadata import SpecMetadata
 from .validate.changes import validate_change
 from .validate.specs import validate_specs
 
@@ -67,16 +73,25 @@ class ProjectStatus:
         specs: list[dict[str, Any]] = []
         for spec_type, spec_id in list_specs(self.paths, config):
             directory = self.paths.specs / spec_type / spec_id
+            spec_path = directory / "spec.md"
             issues = [
                 issue
                 for issue in spec_issues
-                if issue.path and Path(issue.path) in {directory, directory / "spec.md"}
+                if issue.path and Path(issue.path) in {directory, spec_path}
             ]
+            description = None
+            try:
+                description = SpecMetadata(spec_path).description()
+            except SpecifyError as error:
+                # 元数据有误时将它标在对应 spec 行，保留其他索引结果。
+                issues.append(Issue(error.message, error.path))
             reference = f"{spec_type}:{spec_id}"
             specs.append(
                 {
                     "type": spec_type,
                     "id": spec_id,
+                    "path": spec_path.relative_to(self.paths.root).as_posix(),
+                    "description": description,
                     "status": "valid" if not issues else "invalid",
                     "changes": [
                         change["id"]
@@ -100,7 +115,7 @@ class ProjectStatus:
 
 
 class HumanStatus:
-    """只为显式 --human 选项渲染 Rich 表格。"""
+    """为显式 --human 选项渲染 Rich 树和表格。"""
 
     def __init__(self, console: Console):
         """绑定 stdout 控制台，沿用 Rich 的终端宽度检测。"""
@@ -108,16 +123,29 @@ class HumanStatus:
         self.console = console
 
     def specs(self, items: list[dict[str, Any]]) -> None:
-        """展示 formal spec 的类型、ID、校验状态和关联 change 数。"""
+        """按 type 建立分支，在子节点展示各 spec 的简介和状态。"""
 
-        table = Table(title="Formal specs", expand=True)
-        for heading in ("Type", "ID", "Status", "Changes"):
-            table.add_column(heading, overflow="fold")
-        for item in items:
-            table.add_row(
-                item["type"], item["id"], item["status"], str(len(item["changes"]))
-            )
-        self.console.print(table)
+        tree = Tree(Text("Formal specs", style="bold"), guide_style="dim")
+        palette = cycle(("bold cyan", "bold magenta", "bold blue", "bold yellow"))
+        # 所有分支共用最长 ID 的宽度，状态从同一列开始。
+        status_column = max((len(item["id"]) for item in items), default=0) + 2
+        # 项目状态已按 type 和 ID 排序，同一类型只创建一个分支。
+        for spec_type, group in groupby(items, key=itemgetter("type")):
+            branch = tree.add(Text(spec_type, style=next(palette)))
+            for item in group:
+                status = item["status"]
+                change_count = len(item["changes"])
+                change_label = "change" if change_count == 1 else "changes"
+                label = Text.assemble(
+                    (item["id"], "bold"),
+                    " " * (status_column - len(item["id"])),
+                    (status, "green" if status == "valid" else "bold red"),
+                    (f" · {change_count} {change_label}", "dim"),
+                )
+                if item["description"]:
+                    label.append(f" — {item['description']}")
+                branch.add(label)
+        self.console.print(tree)
 
     def changes(self, items: list[dict[str, Any]]) -> None:
         """展示 change 身份、生命周期、校验结果和任务进度。"""
