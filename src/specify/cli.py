@@ -35,6 +35,7 @@ from .status import HumanStatus, ProjectStatus
 from .sync import sync_change
 from .validate.changes import read_metadata, validate_change, validate_changes
 from .validate.specs import validate_specs
+from .web import serve_review
 
 
 class CommandOutput:
@@ -534,6 +535,19 @@ def status_command(context: click.Context, human: bool) -> None:
             presenter.changes(status["changes"])
         else:
             click.echo(json.dumps(status, ensure_ascii=False, sort_keys=True))
+    except SpecifyError as error:
+        CommandOutput.fail(context, error)
+
+
+@main.command("web")
+@click.pass_context
+def web_command(context: click.Context) -> None:
+    """在浏览器中只读 review 当前 Spec 和 Change 差异。"""
+
+    try:
+        if context.obj["json"]:
+            raise UsageError("web 不支持 --json")
+        serve_review(project_paths(context), click.echo)
     except SpecifyError as error:
         CommandOutput.fail(context, error)
 

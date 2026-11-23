@@ -1,0 +1,2 @@
+{"idx": 1, "action": "add", "date": "2026-11-23 20:39:27+08:00", "changeId": "launch-delivery-receipts", "source": "sync", "title": "试点渠道", "content": "仅站内通知渠道在试点期间向发起方开放回执查询。其他渠道保持原行为。", "historyId": "42ad1898e845492581f1af1cee5724bc"}
+{"idx": 2, "action": "remove", "date": "2026-11-23 20:39:29+08:00", "changeId": "retire-receipt-pilot", "source": "sync", "title": "", "content": "", "historyId": "1c1ebe9f49754974861f01a3240c37f2"}

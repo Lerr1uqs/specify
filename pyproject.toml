@@ -21,7 +21,7 @@ specify = "specify.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-specify = ["assets/*.yaml", "assets/templates/*.md"]
+specify = ["assets/*.yaml", "assets/templates/*.md", "assets/review.css", "assets/review.js"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

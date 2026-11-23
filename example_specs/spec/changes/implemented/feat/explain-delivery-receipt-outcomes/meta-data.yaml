@@ -1,0 +1,20 @@
+id: explain-delivery-receipt-outcomes
+title: 让通知回执说明投递结果
+kind: feat
+createdAt: '2026-11-23T20:37:48+08:00'
+updatedAt: '2026-11-23T20:39:31+08:00'
+affects:
+- type: capability
+  id: delivery-receipts
+  change: modify
+- type: component
+  id: notification-service
+  change: modify
+- type: rule
+  id: receipt-retention
+  change: create
+baseVersions:
+  capability:delivery-receipts:query-receipt:
+    8a1f852ab3c4fb77cdad224976cb6c4b1eb3acd765fd1b6af26a7134862311f0
+  component:notification-service:receipt-query:
+    cfb050900f160ed00bf0fddb9a6608e3fc81b953ed42bf72895e0bf3810229ba

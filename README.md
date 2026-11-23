@@ -2,7 +2,7 @@
 
 Specify 是一个以 Markdown Contract 为正式规范、以 change 驱动迭代的命令行工具。项目配置、正式 spec 和 change 文件都保存在仓库目录中；不需要数据库或外部 JSON 状态库。
 
-[在线查看 Specify 项目图谱（GitHub Pages）](https://lerr1uqs.github.io/specify/visualized/index.html)。可以展开 spec 和 Contract，查看 change 如何通过 delta 更新规范，以及同步后的版本历史。
+[在线查看项目图谱示例（GitHub Pages）](https://lerr1uqs.github.io/specify/visualized/index.html)。这是静态示例；要查看手头项目，请运行 `specify web`。
 
 ## 环境要求
 
@@ -45,6 +45,21 @@ specify init ./my-project
 ```
 
 初始化会生成 `spec/config.yaml`、`spec/specs/`、change 目录、索引，以及 `spec/template/` 下的内置写作模板。重新初始化会保留已存在的模板文件。后续命令在项目目录中运行即可；默认使用当前工作目录。
+
+## 在浏览器中 Review
+
+在项目根目录运行 `specify web`。它会打开默认浏览器，并在终端打印本机地址。试用本仓库示例：
+
+```bash
+uv run specify --root example_specs web
+```
+
+- **正式 Spec**：按 type 浏览当前规范，点击 Spec 查看简介和 Contract 正文。
+- **Changes**：左侧 Change 通过曲线连到右侧各个 Spec；每个 Spec 用树形折线展开到 Contract。红线表示修改、绿线表示新增、紫色虚线表示删除、蓝线表示重命名。点击 Contract 查看逐行 diff。
+- **任务进度**：从 `tasks.md` 读取完成数、总数和百分比，点击进度条所在的卡片展开任务清单。任务全部完成不代表 change 已同步。
+- **差异来源**：未同步的 change 用当前正文预览，基线不匹配时会提示。已同步的 change 比较当次历史快照；没有快照时只展示 delta 声明。已拒绝的 change 不生成生效预览。
+
+页面只监听本机，不修改项目文件。修改 Markdown 后刷新页面即可，终端按 `Ctrl+C` 停止。
 
 ## 创建和编写 spec
 

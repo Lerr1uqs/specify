@@ -1,0 +1,118 @@
+/* 本地 Review：窄屏上下排列，diff 保留符号与颜色。 */
+:root {
+  color-scheme: light;
+  --ink: #17263a;
+  --muted: #465870;
+  --border: #d5dfe9;
+  --accent: #175b51;
+  font: 16px/1.55 system-ui, sans-serif;
+  color: var(--ink);
+  background: #f2f6f8;
+}
+
+body { margin: 0; }
+a { color: var(--accent); }
+:focus-visible { outline: 2px solid #086457; outline-offset: 3px; }
+.frame { width: min(92%, 1320px); margin-inline: auto; }
+header { background: #fff; border-bottom: 1px solid var(--border); padding: 16px 0; }
+header h1, header p { margin: 0 0 6px; }
+header small { color: var(--accent); font-weight: 500; }
+header nav { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+nav a { display: block; padding: 5px 10px; border-radius: 6px; text-decoration: none; }
+nav a:hover, nav a[aria-current] { color: #12473f; background: #d9efe9; }
+nav a[aria-current] { font-weight: 700; }
+.skip { position: absolute; top: -5rem; background: #fff; padding: 6px 12px; }
+.skip:focus { top: 4px; }
+.layout { display: grid; grid-template-columns: minmax(195px, 255px) minmax(0, 1fr); gap: 24px; padding-block: 24px 48px; }
+.sidebar { overflow-wrap: anywhere; }
+.sidebar h2 { font-size: 0.9rem; color: var(--muted); margin: 0 0 4px; }
+.sidebar ul { list-style: none; margin: 0 0 16px; padding: 0; }
+main { overflow-wrap: anywhere; }
+main h2 { margin: 0; }
+.eyebrow { color: var(--muted); margin: 0 0 4px; }
+.card { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin: 12px 0; }
+.card h3, .card h4 { margin: 4px 0; }
+summary { cursor: pointer; }
+/* 进度条在任务列表收起时也可见，数字不依赖颜色。 */
+.task-count { color: var(--muted); font-variant-numeric: tabular-nums; }
+.task-progress progress { display: block; width: 100%; height: 12px; margin-top: 8px; accent-color: var(--accent); }
+.task-list li + li { margin-top: 6px; }
+.pill { display: inline-block; padding: 1px 8px; border-radius: 999px; color: #284763; background: #e8f1f9; font-size: 0.82rem; }
+.added { --edge: #23784c; --tone: #155333; --tint: #def4e7; }
+.modified { --edge: #ad3845; --tone: #842532; --tint: #fbe4e6; }
+.removed { --edge: #7953a1; --tone: #563679; --tint: #f0e8fa; }
+.renamed { --edge: #31699b; --tone: #244d75; --tint: #e2effc; }
+.pill:is(.added, .modified, .removed, .renamed) { color: var(--tone); background: var(--tint); }
+.diff .insert { color: #155333; background: #def4e7; }
+.diff .delete { color: #882831; background: #fbe4e6; }
+
+/* 外层用平滑曲线，内层用共享树干的直角分支。 */
+.impact-tree {
+  --tree-line: #75869a;
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 3fr);
+  column-gap: clamp(24px, 6vw, 72px);
+  align-items: start;
+}
+.impact-curves {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+}
+.impact-curves path { fill: none; stroke: var(--tree-line); stroke-width: 2; stroke-linecap: round; }
+.impact-legend { color: var(--muted); font-size: 0.9rem; }
+.impact-source, .impact-node, .operation summary {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+.impact-source { border-color: var(--accent); background: #d9efe9; }
+.impact-source code { display: block; }
+.target-node h4 { margin: 0; }
+.target-node a { font-size: 0.85rem; }
+.impact-branches, .impact-contracts { list-style: none; margin: 0; padding: 0; }
+.impact-branches > li { padding-bottom: 14px; }
+.impact-branches > li > .notice { margin: 0; }
+.impact-contracts {
+  --indent: clamp(18px, 3vw, 30px);
+  --joint: 28px;
+  margin-left: 12px;
+  padding-left: var(--indent);
+}
+/* 把 diff 的末尾外边距留在分支内，避免相邻两段树干之间出现空隙。 */
+.impact-contracts > li { display: flow-root; position: relative; padding-top: 10px; }
+/* 左侧共用竖线，末项恰好在水平分支处结束，形成 ├ 和 └。 */
+.impact-contracts > li::before, .impact-contracts > li::after {
+  content: "";
+  position: absolute;
+  left: calc(-1 * var(--indent));
+  pointer-events: none;
+}
+.impact-contracts > li::before { inset-block: 0; border-left: 2px solid var(--tree-line); }
+.impact-contracts > li:last-child::before { bottom: auto; height: calc(var(--joint) + 2px); }
+.impact-contracts > li::after {
+  top: var(--joint);
+  width: var(--indent);
+  border-top: 2px solid var(--edge);
+}
+.impact-contracts > .removed::after { border-top-style: dashed; }
+.operation summary { border-left: 3px solid var(--edge); }
+.operation summary > code { color: var(--muted); }
+.removed > .operation summary > code { color: var(--tone); text-decoration: underline; }
+.notice { border-left: 3px solid #b28846; padding: 6px 10px; background: #fffaed; }
+pre { background: #f2f6f8; border-radius: 6px; padding: 8px 10px; overflow: auto; }
+.diff { white-space: pre-wrap; }
+.diff span { display: inline-block; width: 100%; }
+.diff .hunk { color: var(--muted); }
+blockquote { margin-inline: 0; border-left: 3px solid var(--border); padding-left: 12px; }
+
+@media (max-width: 700px) {
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .sidebar { max-height: 240px; overflow: auto; border-bottom: 1px solid var(--border); }
+}

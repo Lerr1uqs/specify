@@ -160,6 +160,83 @@
       "kind": "test",
       "path": "test/2026-11-22-cover-recovery-expiry/tasks.md",
       "sha256": "1b26a1b4166c52ffa3af93c79e67013df99b4251838e21b05a4626d23d2e797f"
+    },
+    {
+      "archivedAt": "2026-11-23T20:39:27+08:00",
+      "id": "launch-delivery-receipts",
+      "kind": "feat",
+      "path": "feat/2026-11-23-launch-delivery-receipts/change.md",
+      "sha256": "a18306f83c9857f06458cbebdf6a4e016f9685850905f7d416652ba4453edb76"
+    },
+    {
+      "archivedAt": "2026-11-23T20:39:27+08:00",
+      "id": "launch-delivery-receipts",
+      "kind": "feat",
+      "path": "feat/2026-11-23-launch-delivery-receipts/deltas/capability/delivery-receipts.md",
+      "sha256": "ff5902ee76ddb9cd1a55f314c85c03396a1fb401094ee4bb2a3e6ec5f725c52c"
+    },
+    {
+      "archivedAt": "2026-11-23T20:39:27+08:00",
+      "id": "launch-delivery-receipts",
+      "kind": "feat",
+      "path": "feat/2026-11-23-launch-delivery-receipts/deltas/component/notification-service.md",
+      "sha256": "95c864e5f2e3e254795bfb725ba55e0bfa3b46ddfdf1d9d2c4d66982be944e9b"
+    },
+    {
+      "archivedAt": "2026-11-23T20:39:27+08:00",
+      "id": "launch-delivery-receipts",
+      "kind": "feat",
+      "path": "feat/2026-11-23-launch-delivery-receipts/deltas/rule/receipt-pilot.md",
+      "sha256": "6b868f66184db21bbdf5fcdeb3490767c120a81a159dcbed317c046036d6d104"
+    },
+    {
+      "archivedAt": "2026-11-23T20:39:27+08:00",
+      "id": "launch-delivery-receipts",
+      "kind": "feat",
+      "path": "feat/2026-11-23-launch-delivery-receipts/meta-data.yaml",
+      "sha256": "730172ab33d7797679cd4987766ef907da0a6e2f698697108d845b0a4f00e85b"
+    },
+    {
+      "archivedAt": "2026-11-23T20:39:27+08:00",
+      "id": "launch-delivery-receipts",
+      "kind": "feat",
+      "path": "feat/2026-11-23-launch-delivery-receipts/tasks.md",
+      "sha256": "bddd38dd6711432c220cfadf634f3b42bcb4abe24bb1030db82c4381486626af"
+    },
+    {
+      "archivedAt": "2026-11-23T20:39:30+08:00",
+      "id": "retire-receipt-pilot",
+      "kind": "simplify",
+      "path": "simplify/2026-11-23-retire-receipt-pilot/change.md",
+      "sha256": "6df508a0a7dcf74cc4ab64c91dbf72322384ec31361e98b1c6df0259bbe5b64f"
+    },
+    {
+      "archivedAt": "2026-11-23T20:39:30+08:00",
+      "id": "retire-receipt-pilot",
+      "kind": "simplify",
+      "path": "simplify/2026-11-23-retire-receipt-pilot/deltas/capability/delivery-receipts.md",
+      "sha256": "e661f7b688f8cc5fc21d710ca59b83a1717121882155a488b83f877a31984507"
+    },
+    {
+      "archivedAt": "2026-11-23T20:39:30+08:00",
+      "id": "retire-receipt-pilot",
+      "kind": "simplify",
+      "path": "simplify/2026-11-23-retire-receipt-pilot/deltas/rule/receipt-pilot.md",
+      "sha256": "cbe9120e5e13c288b5b55d3b65dd2bc6bd3945b456a16954c48764ad4228ac3a"
+    },
+    {
+      "archivedAt": "2026-11-23T20:39:30+08:00",
+      "id": "retire-receipt-pilot",
+      "kind": "simplify",
+      "path": "simplify/2026-11-23-retire-receipt-pilot/meta-data.yaml",
+      "sha256": "47a78abc00bbaf23dc642003b5d9b77df8d100114571ca3833668545301ed325"
+    },
+    {
+      "archivedAt": "2026-11-23T20:39:30+08:00",
+      "id": "retire-receipt-pilot",
+      "kind": "simplify",
+      "path": "simplify/2026-11-23-retire-receipt-pilot/tasks.md",
+      "sha256": "b9f9ef2d728bb243aa1741b2b028d9e54f0b16240aa6a0da635e8b71a58584be"
     }
   ],
   "version": 1

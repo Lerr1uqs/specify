@@ -1,0 +1,1 @@
+{"idx": 1, "action": "add", "date": "2026-11-23 20:39:27+08:00", "changeId": "launch-delivery-receipts", "source": "sync", "title": "通知回执查询接口", "content": "通知服务按通知编号向原发起方返回当前投递状态和最后更新时间。\n\n找不到该发起方的回执时，返回不存在；不回传通知正文和目标地址。", "historyId": "42ad1898e845492581f1af1cee5724bc"}
