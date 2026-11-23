@@ -1,0 +1,2 @@
+{"idx": 1, "action": "add", "date": "2026-11-23 20:39:27+08:00", "changeId": "launch-delivery-receipts", "source": "sync", "title": "试点结束条件", "content": "试点结果完成复核后，常规开放范围改由通知回执能力规范定义，试点规则不再作为入口条件。", "historyId": "42ad1898e845492581f1af1cee5724bc"}
+{"idx": 2, "action": "remove", "date": "2026-11-23 20:39:29+08:00", "changeId": "retire-receipt-pilot", "source": "sync", "title": "", "content": "", "historyId": "1c1ebe9f49754974861f01a3240c37f2"}

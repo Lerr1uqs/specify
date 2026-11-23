@@ -1,0 +1,27 @@
+id: retire-receipt-pilot
+title: 结束回执试点并移除临时规则
+kind: simplify
+createdAt: '2026-11-23T20:37:47+08:00'
+updatedAt: '2026-11-23T20:39:30+08:00'
+affects:
+- type: rule
+  id: receipt-pilot
+  change: remove
+- type: capability
+  id: delivery-receipts
+  change: modify
+baseVersions:
+  capability:delivery-receipts:query-receipt:
+    689af2639f07246877f9479d63ec9e169dd606a2b276d8b9d68216249ec71447
+  rule:receipt-pilot:pilot-channels:
+    c61822628e595236d1201e598beeb124d600d537be99b62b48397d80ff6fb73e
+  rule:receipt-pilot:pilot-exit:
+    3fadbb1d31ca597f1aa32a8e3a2d0f76dd6b65566b210ef1709df534267a5860
+sync:
+  appliedAt: '2026-11-23T20:39:29+08:00'
+  deltaHashes:
+    capability/delivery-receipts.md:
+      e661f7b688f8cc5fc21d710ca59b83a1717121882155a488b83f877a31984507
+    rule/receipt-pilot.md:
+      cbe9120e5e13c288b5b55d3b65dd2bc6bd3945b456a16954c48764ad4228ac3a
+  historyId: 1c1ebe9f49754974861f01a3240c37f2

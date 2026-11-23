@@ -1,0 +1,25 @@
+id: launch-delivery-receipts
+title: 上线通知投递回执试点
+kind: feat
+createdAt: '2026-11-23T20:37:47+08:00'
+updatedAt: '2026-11-23T20:39:27+08:00'
+affects:
+- type: capability
+  id: delivery-receipts
+  change: create
+- type: component
+  id: notification-service
+  change: modify
+- type: rule
+  id: receipt-pilot
+  change: create
+sync:
+  appliedAt: '2026-11-23T20:39:27+08:00'
+  deltaHashes:
+    capability/delivery-receipts.md:
+      ff5902ee76ddb9cd1a55f314c85c03396a1fb401094ee4bb2a3e6ec5f725c52c
+    component/notification-service.md:
+      95c864e5f2e3e254795bfb725ba55e0bfa3b46ddfdf1d9d2c4d66982be944e9b
+    rule/receipt-pilot.md:
+      6b868f66184db21bbdf5fcdeb3490767c120a81a159dcbed317c046036d6d104
+  historyId: 42ad1898e845492581f1af1cee5724bc

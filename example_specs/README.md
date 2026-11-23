@@ -27,6 +27,22 @@ uv run specify --root example_specs history component:auth-service:session-issua
 uv run specify --root example_specs validate --archived
 ```
 
+## Web Review：通知回执的三个阶段
+
+```bash
+uv run specify --root example_specs web
+```
+
+打开 **Changes**，按下表选择 change。点击右侧的 Contract 节点查看逐行 diff。
+
+| Change | 阶段 | 可以看到什么 |
+| --- | --- | --- |
+| `launch-delivery-receipts` | 已归档 | 新增整份 `capability:delivery-receipts` 和 `rule:receipt-pilot`；同时给现有 `component:notification-service` 新增一条 Contract。 |
+| `retire-receipt-pilot` | 已归档 | 删除整份 `rule:receipt-pilot` 及其中两条 Contract，并修改正式回执能力。试点规则已不在正式 Spec 列表，但当时的删除 diff 仍可查。 |
+| `explain-delivery-receipt-outcomes` | 已实施，未同步 | 仅重命名一条 Contract、新增一条结果说明、修改通知服务接口，并预览新增保留规则。打开当前正式 Spec，对照仍生效的原名称和正文。 |
+
+前两项通过 CLI 同步并归档，保留真实回执和版本快照；最后一项故意停在 `implemented`，以便检查尚未生效的预览。还可以打开 `publish-recovery-controls` 查看一次 change 如何影响四份不同类型的 Spec。
+
 ## 目录内容
 
 - `spec/config.yaml`：项目允许的 spec type 和 change kind。

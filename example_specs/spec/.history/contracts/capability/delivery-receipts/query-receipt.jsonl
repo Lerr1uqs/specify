@@ -1,0 +1,2 @@
+{"idx": 1, "action": "add", "date": "2026-11-23 20:39:27+08:00", "changeId": "launch-delivery-receipts", "source": "sync", "title": "查询通知回执", "content": "试点渠道的发起方可用通知编号查询投递回执。回执状态为待投递、已投递或失败。\n\n查询不改变通知状态，也不会触发再次投递。", "historyId": "42ad1898e845492581f1af1cee5724bc"}
+{"idx": 2, "action": "modify", "date": "2026-11-23 20:39:29+08:00", "changeId": "retire-receipt-pilot", "source": "sync", "title": "查询通知回执", "content": "站内通知和邮件的发起方可用通知编号查询投递回执。回执状态为待投递、已投递或失败。\n\n查询不改变通知状态，也不会触发再次投递。", "historyId": "1c1ebe9f49754974861f01a3240c37f2"}

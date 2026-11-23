@@ -10,6 +10,7 @@
 ## Capability
 
 - [`account-recovery`](specs/capability/account-recovery/spec.md) — 发起账号恢复、验证身份与重置密码
+- [`delivery-receipts`](specs/capability/delivery-receipts/spec.md) — 按通知编号查询站内通知和邮件的投递回执
 - [`user-auth`](specs/capability/user-auth/spec.md) — 密码登录、通行密钥与会话过期
 
 ## Component
