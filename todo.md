@@ -1,2 +1,5 @@
 - [ ] spec 有过时有冲突如何调整？skill？
 - [ ] rule应该是必须遵守的规定
+- [ ] archive之前应该强制一次 sync的检查？
+- [ ] 有问题怎么抛出给前端展示呢？sync检查？
+- [ ]  specify history requirement:backend-indicators-signals:line-touch-signal --limit 3 --human 每次都要好长一段 补全+交互式的方式最好 比如我 可以看到全部候选的折叠 但是我选择 r就能筛选出来一部分 rbl 就能选择这个了？

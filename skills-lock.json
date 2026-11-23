@@ -1,0 +1,40 @@
+{
+  "version": 2,
+  "skills": {
+    "specify-apply-change": {
+      "source": "Lerr1uqs/specify",
+      "commit": "e5e4cd7f503ccd022b093ccda77b204c74148492",
+      "sourceType": "github",
+      "skillPath": "skills/specify-apply-change/SKILL.md",
+      "computedHash": "fccfd915be45717e0d8f4cfdd6f6433068da35ef91fbc67e4133f04f6f5f35dd"
+    },
+    "specify-archive-change": {
+      "source": "Lerr1uqs/specify",
+      "commit": "e5e4cd7f503ccd022b093ccda77b204c74148492",
+      "sourceType": "github",
+      "skillPath": "skills/specify-archive-change/SKILL.md",
+      "computedHash": "758eff689446f379831931aeb14541eef036804f38cd02056f3a984c1135b359"
+    },
+    "specify-explore": {
+      "source": "Lerr1uqs/specify",
+      "commit": "e5e4cd7f503ccd022b093ccda77b204c74148492",
+      "sourceType": "github",
+      "skillPath": "skills/specify-explore/SKILL.md",
+      "computedHash": "a4a97a5266fb5c599f49ed8b245a5f16f53dd3e6af9bb88d7ca7da596fab52da"
+    },
+    "specify-propose": {
+      "source": "Lerr1uqs/specify",
+      "commit": "e5e4cd7f503ccd022b093ccda77b204c74148492",
+      "sourceType": "github",
+      "skillPath": "skills/specify-propose/SKILL.md",
+      "computedHash": "5defdab0c8a39d2c2fcf47164e546c8d21f02974f5b8211ad18fc693ec7a4524"
+    },
+    "specify-workflow": {
+      "source": "Lerr1uqs/specify",
+      "commit": "e5e4cd7f503ccd022b093ccda77b204c74148492",
+      "sourceType": "github",
+      "skillPath": "skills/specify-workflow/SKILL.md",
+      "computedHash": "2a229252490307e095092a9e7ea04f6a55727b445ce403775c9f8addb6cbb1a1"
+    }
+  }
+}
