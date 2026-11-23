@@ -28,7 +28,7 @@ specify --help
 npx skills add Lerr1uqs/specify --skill '*'
 ```
 
-这会安装探索、提案、实施和归档四个专用 skill，以及 `specify-workflow` CLI 参考。只想查阅 CLI 用法时，可以单独安装参考 skill：
+技能包包含 [`specify` 主技能](skills/specify/SKILL.md)、探索、提案、实施和归档四个专用 skill，以及 `specify-workflow` CLI 参考。初次接触 Specify 可从主技能了解概念、基本命令和各技能的入口。只想查阅 CLI 用法时，可以单独安装参考 skill：
 
 ```bash
 npx skills add Lerr1uqs/specify --skill specify-workflow
@@ -61,8 +61,10 @@ uv run specify --root example_specs web
 ```
 
 - **正式 Spec**：按 type 浏览当前规范，点击 Spec 查看简介和 Contract 正文。
-- **Changes**：左侧 Change 通过曲线连到右侧各个 Spec；每个 Spec 用树形折线展开到 Contract。红线表示修改、绿线表示新增、紫色虚线表示删除、蓝线表示重命名。点击 Contract 查看逐行 diff。
-- **时间与任务进度**：Change 标题下方显示已有的创建、更新、同步和归档时间，保留原始时区。展开任务进度卡片可查看 `tasks.md` 中的完成数、总数和任务清单。
+- **Changes**：左侧 Change 通过曲线连到右侧各个 Spec；每个 Spec 用树形折线展开到 Contract。点击 Contract 查看逐行 diff，或用「展开全部」查看当前 Change 的所有差异。点击 Spec 名称可在修改列表旁边打开正式正文，此时 Change 根节点和连线让出空间，收起正文即可恢复影响树。
+- **待拆解需求**：`proposed` 详情在可滚动的正文框中渲染 `change.md`。进入 `processing` 后可以查看任务进度、影响范围和 diff。
+- **优先级**：左栏在各状态分组内按 P0 到 P4 排序，同级保留原顺序。选择「P2 及以上」可查看 P0、P1 和 P2。色块随档位依次使用红、蓝、紫、绿、黄。
+- **时间与任务进度**：Change 标题下方显示已有的创建、更新、同步和归档时间，保留原始时区。任务进度与变更说明一同展示，可直接查看完成数、总数和任务清单。
 - **差异来源**：未同步的 change 按捕获的基线正文预览。已同步的 change 比较当次同步前后的历史快照。当草稿基线或同步结果落后于当前 Contract 时，标题栏会标出「已落后当前 Spec」。缺少匹配的历史正文时，页面显示 delta 声明。
 - **查看当前正文**：基线过期时，点击提示中的 Contract 引用，弹窗会显示当前正式 Contract 的标题与正文。逐行 diff 保留在变更详情中。
 
@@ -93,12 +95,29 @@ specify --root ./my-project list --spec --human
 
 ## Change 工作流
 
-创建影响正式 spec 的 change，编辑生成的 `change.md`、`tasks.md` 和 delta：
+创建 change 并在 `change.md` 记录背景、动机和需求。可按内容使用 `## Background`、`## Why`、`## Requirement` 等标题。此时状态为 `proposed`：
 
 ```bash
-specify change create feat add-password-login \
-  --affect capability:user-auth:modify
+specify change create feat add-password-login --priority P1
 ```
+
+优先级保存在 Change 的 `meta-data.yaml` 中。创建时省略 `--priority` 默认为 `P2`，老 Change 缺少字段时也按 `P2` 读取。
+
+```bash
+specify change priority add-password-login P0
+```
+
+归档后优先级固定。调整未归档 Change 的优先级只更新元数据和更新时间。
+
+**后续计划**：支持在项目配置中定义有序档位和默认值，让团队可以把 `P00` 排在 `P0` 之前。CLI 校验、Web 排序和筛选届时共用同一套档位配置。当前内置档位为 `P0` 到 `P4`。
+
+开始拆解时进入 `processing`，在同一份 `change.md` 补充设计和实现方案，再把实施与验证工作拆进 `tasks.md`。影响范围明确时可在同一条命令里声明：
+
+```bash
+specify change process add-password-login --affect capability:user-auth:modify
+```
+
+可以先运行不带选项的 `change process <id>`，等影响范围明确后再通过同一命令补充 `--affect`，或用 `--no-spec-impact "原因"` 明确无 Spec 影响。范围已知时，也可以在 `change create` 上直接使用这两个选项之一创建 `processing`。旧版已写好 tasks 和 delta 的 `proposed` 可运行 `change process <id>` 原样迁移，保留现有影响范围和基线。
 
 对于修改、删除或重命名已有 Contract 的 delta，完成 delta 后显式捕获正文基线。新增 Contract 不需要基线。
 
@@ -117,7 +136,7 @@ specify change archive add-password-login
 
 如果 sync 检测到基线变化，会拒绝整次同步。阅读最新 Contract、调整 delta，并重新运行 `change baseline` 后再验证和同步。成功 sync 后 delta 被回执固定；后续语义调整应另建 change。Archive 只归档已同步 change，不重放 delta。
 
-不影响正式 Contract 的 bugfix 可以不创建 delta：`change create` 不传 `--affect` 时会记录 `specImpact.kind: none`。
+未声明影响范围的 `processing` 在 `verify` 时会提示补充。明确无正式 Spec 影响的 change 完成任务后可直接从 `implemented` 归档。
 
 ## Contract 历史
 

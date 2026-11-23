@@ -4,7 +4,7 @@
 TBD - created by archiving change implement-specify-cli-v1. Update Purpose after archive.
 ## Requirements
 ### Requirement: Project initialization and scaffolding
-The CLI SHALL initialize a target repository with validated `spec/config.yaml`, `specs/`, `changes/{proposed,implemented,rejected,archived}/`, and a deterministic empty index, and SHALL create fixed-format spec and change skeletons.
+The CLI SHALL initialize a target repository with validated `spec/config.yaml`, `specs/`, `changes/{proposed,processing,implemented,rejected,archived}/`, and a deterministic empty index, and SHALL create fixed-format spec and change skeletons.
 
 #### Scenario: Initialize with a valid config
 - **WHEN** a user runs `specify init <path> --config <init.yaml>` with non-empty valid `specTypes` and `kinds`
@@ -37,14 +37,22 @@ The CLI SHALL validate spec structure, unique Contract IDs and normalized titles
 - **THEN** `specify change verify <id>` reports the mismatch and exits with code 1
 
 ### Requirement: Change lifecycle
-The CLI SHALL locate changes by globally unique ID, enforce valid state transitions, and support create, status, verify, implement, reject, remove, and confirmation-gated removal across the configured change tree.
+The CLI SHALL locate changes by globally unique ID, enforce valid state transitions, and support create, process, status, verify, implement, reject, remove, and confirmation-gated removal across the configured change tree.
+
+#### Scenario: Capture a requirement before planning
+- **WHEN** a user runs `specify change create <kind> <id>` without declaring Spec impact
+- **THEN** the CLI creates a proposed change with `change.md` starting at `## Requirement` and basic metadata
+
+#### Scenario: Begin processing or migrate a legacy proposal
+- **WHEN** a user runs `specify change process <id>` on a proposed change
+- **THEN** it moves to `changes/processing/<kind>/<id>/`, creates a task skeleton when needed, and preserves any existing tasks, deltas, and baselines
 
 #### Scenario: Mark a verified change implemented
-- **WHEN** a proposed change has complete tasks and passes deterministic verification
+- **WHEN** a processing change has complete tasks and passes deterministic verification
 - **THEN** `specify change implement <id>` moves it to `changes/implemented/<kind>/<id>/`
 
 #### Scenario: Reject with a reason
-- **WHEN** a proposed change is rejected with a supplied reason
+- **WHEN** a proposed or processing change is rejected with a supplied reason
 - **THEN** the CLI moves it to `changes/rejected/<kind>/<id>/`, writes `rejectedReason`, and preserves the proposal artifacts
 
 ### Requirement: Delta merge and synchronization

@@ -10,11 +10,12 @@ uv run specify --root example_specs status --human
 
 第一条展示活跃 change 的状态、kind 和 tasks 进度。第二条展示五种正式 spec，包括用户能力、组件职责、业务需求、架构和规则。第三条同时展示正式 spec 和未归档 change，包含 rejected。`list --spec` 默认输出缩进文本。`list` 和 `status` 默认输出 JSON。
 
-## 四种 change 状态
+## 五种 change 状态
 
 | 状态 | 示例 | 可以看到什么 |
 | --- | --- | --- |
-| `proposed` | `show-recovery-delivery-state` | 有目标 spec 和 delta，仍在提案阶段 |
+| `proposed` | `preview-audit-export` | 只有需求正文和基础元数据，Web 以可滚动的 Markdown 正文框展示 |
+| `processing` | `show-recovery-delivery-state` | 已拆分 tasks 和 delta，可预览影响范围 |
 | `implemented` | `restore-recovery-attempt-limits` | 同步恢复曾删除的 Contract ID，保留旧历史 |
 | `rejected` | `expose-recovery-lookup-result` | 保存提案和未采纳的理由 |
 | `archived` | `publish-recovery-controls` | 多份 delta 跨 type 修改规范，归档清单保留文件校验值 |
@@ -45,10 +46,10 @@ uv run specify --root example_specs web
 
 ### Web Review 中的过期基线
 
-`extend-audit-retention-to-60-days` 和 `extend-audit-retention-to-90-days` 都以 `rule:audit-policy:retention` 的 30 天留存期为基线。90 天版本已通过 CLI 同步，60 天版本留在 `proposed`，用于演示过期基线。
+`extend-audit-retention-to-60-days` 和 `extend-audit-retention-to-90-days` 都以 `rule:audit-policy:retention` 的 30 天留存期为基线。90 天版本已通过 CLI 同步，60 天版本留在 `processing`，用于演示过期基线。
 
 - 打开 60 天 change，展开「恢复审计留存周期」。标题栏显示「已落后当前 Spec」，diff 显示 30 → 60 天。点击提示里的 `rule:audit-policy:retention`，弹窗会显示当前 90 天的正式正文。
-- 打开 90 天 change，历史 diff 显示 30 → 90 天。点「查看当前 Spec」可以看到当前生效的 90 天留存期。
+- 打开 90 天 change，历史 diff 显示 30 → 90 天。点 Spec 名称可以展开当前生效的 90 天留存期。
 
 `change verify extend-audit-retention-to-60-days` 和全量 `validate` 会报该提案的基线已变化。可分别运行 `validate --specs` 和 `validate --archived` 核验正式规范和归档。
 

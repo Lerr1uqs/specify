@@ -2,7 +2,7 @@ id: extend-audit-retention-to-90-days
 title: 将恢复审计留存期延至 90 天
 kind: feat
 createdAt: '2026-11-23T22:49:54+08:00'
-updatedAt: '2026-11-23T22:50:23+08:00'
+updatedAt: '2026-11-24T00:16:48+08:00'
 affects:
 - type: rule
   id: audit-policy
@@ -16,3 +16,4 @@ sync:
     rule/audit-policy.md:
       1e490ee52cea5bb3780b0b088fc907ffea592b6f5762552502eedd298ab5c55c
   historyId: ca6b4f0de69c41a1b03dfc0724ca93f4
+priority: P3

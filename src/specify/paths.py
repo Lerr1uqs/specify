@@ -10,7 +10,7 @@ from .models import Change
 
 DATE_PREFIX = re.compile(r"^\d{4}-\d{2}-\d{2}-(.+)$")
 ID_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-STATUSES = ("proposed", "implemented", "rejected", "archived")
+STATUSES = ("proposed", "processing", "implemented", "rejected", "archived")
 
 
 class RepoPaths:

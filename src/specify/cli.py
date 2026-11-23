@@ -26,10 +26,10 @@ from .history_picker import HistoryReferenceCatalog, choose_history_reference
 from .history_view import HistoryView, HumanHistory
 from .index import SpecIndex, build_index
 from .io import move_to_trash
-from .models import Change, Issue
+from .models import CHANGE_PRIORITIES, DEFAULT_CHANGE_PRIORITY, Change, Issue
 from .parse.spec import parse_spec_file
 from .paths import RepoPaths, find_change, validate_id
-from .scaffold import create_change, create_spec, initialize
+from .scaffold import create_change, create_spec, initialize, process_change
 from .spec_metadata import SpecMetadata
 from .status import HumanStatus, ProjectStatus
 from .sync import sync_change
@@ -219,16 +219,86 @@ def change_group() -> None:
 @click.option(
     "--affect", multiple=True, help="目标格式：type:spec-id:create|modify|remove。"
 )
+@click.option(
+    "--no-spec-impact", metavar="REASON", help="明确说明不影响正式 Spec 的原因。"
+)
+@click.option(
+    "--priority",
+    type=click.Choice(CHANGE_PRIORITIES),
+    default=DEFAULT_CHANGE_PRIORITY,
+    show_default=True,
+    help="设置 change 的初始优先级。",
+)
 @click.pass_context
 def change_create(
-    context: click.Context, kind: str, change_id: str, affect: tuple[str, ...]
+    context: click.Context,
+    kind: str,
+    change_id: str,
+    affect: tuple[str, ...],
+    priority: str,
+    no_spec_impact: str | None,
 ) -> None:
-    """创建 proposed change 和可编辑文件骨架。"""
+    """录入 proposed 需求，或在声明 Spec 影响时直接进入 processing。"""
 
     try:
         paths = project_paths(context)
-        target = create_change(paths, load_config(paths), kind, change_id, affect)
+        target = create_change(
+            paths, load_config(paths), kind, change_id, affect, priority, no_spec_impact
+        )
         CommandOutput.emit(context, f"已创建 {target}")
+    except SpecifyError as error:
+        CommandOutput.fail(context, error)
+
+
+@change_group.command("process")
+@click.argument("change_id")
+@click.option(
+    "--affect", multiple=True, help="目标格式：type:spec-id:create|modify|remove。"
+)
+@click.option(
+    "--no-spec-impact", metavar="REASON", help="明确说明不影响正式 Spec 的原因。"
+)
+@click.pass_context
+def change_process(
+    context: click.Context,
+    change_id: str,
+    affect: tuple[str, ...],
+    no_spec_impact: str | None,
+) -> None:
+    """开始拆解需求，或补充 processing change 的影响范围。"""
+
+    try:
+        paths = project_paths(context)
+        change = find_change(paths, change_id)
+        target = process_change(
+            paths, load_config(paths), change, affect, no_spec_impact
+        )
+        CommandOutput.emit(context, f"{change.id} 正在 processing：{target}")
+    except SpecifyError as error:
+        CommandOutput.fail(context, error)
+
+
+@change_group.command("priority")
+@click.argument("change_id")
+@click.argument("priority", type=click.Choice(CHANGE_PRIORITIES))
+@click.pass_context
+def change_priority(context: click.Context, change_id: str, priority: str) -> None:
+    """调整未归档 change 的优先级。"""
+
+    try:
+        change = find_change(project_paths(context), change_id)
+        if change.status == "archived":
+            raise SpecifyError("已归档的 change 不能调整优先级")
+
+        # 优先级属于排期元数据，调整时无需重新校验可能已经过期的 delta。
+        metadata = read_metadata(change)
+        if metadata.get("priority") != priority:
+            metadata["priority"] = priority
+            metadata["updatedAt"] = (
+                datetime.now().astimezone().isoformat(timespec="seconds")
+            )
+            dump_yaml(change.path / "meta-data.yaml", metadata)
+        CommandOutput.emit(context, f"{change.id} 的优先级为 {priority}")
     except SpecifyError as error:
         CommandOutput.fail(context, error)
 
@@ -314,8 +384,8 @@ def change_implement(context: click.Context, change_id: str) -> None:
         paths = project_paths(context)
         config = load_config(paths)
         change = find_change(paths, change_id)
-        if change.status != "proposed":
-            raise SpecifyError("只有 proposed change 可以标记为 implemented")
+        if change.status != "processing":
+            raise SpecifyError("只有 processing change 可以标记为 implemented")
         issues = validate_change(paths, config, change, require_complete_tasks=True)
         if issues:
             CommandOutput.emit(
@@ -340,15 +410,15 @@ def change_implement(context: click.Context, change_id: str) -> None:
 @click.option("--reason", required=True)
 @click.pass_context
 def change_reject(context: click.Context, change_id: str, reason: str) -> None:
-    """保存拒绝理由，并将 proposed change 移到 rejected。"""
+    """保存拒绝理由，并将 proposed 或 processing change 移到 rejected。"""
 
     try:
         if not reason.strip():
             raise SpecifyError("拒绝理由不能为空")
         paths = project_paths(context)
         change = find_change(paths, change_id)
-        if change.status != "proposed":
-            raise SpecifyError("只有 proposed change 可以被拒绝")
+        if change.status not in {"proposed", "processing"}:
+            raise SpecifyError("只有 proposed 或 processing change 可以被拒绝")
         metadata = read_metadata(change)
         metadata["rejectedReason"] = reason.strip()
         metadata["updatedAt"] = (
@@ -368,13 +438,13 @@ def change_reject(context: click.Context, change_id: str, reason: str) -> None:
 @click.option("--yes", is_flag=True, help="跳过确认。")
 @click.pass_context
 def change_remove(context: click.Context, change_id: str, yes: bool) -> None:
-    """将可移除的 proposed/rejected change 移入项目 .trash。"""
+    """将可移除的 proposed、processing 或 rejected change 移入项目 .trash。"""
 
     try:
         paths = project_paths(context)
         change = find_change(paths, change_id)
-        if change.status not in {"proposed", "rejected"}:
-            raise SpecifyError("只能移除 proposed 或 rejected change")
+        if change.status not in {"proposed", "processing", "rejected"}:
+            raise SpecifyError("只能移除 proposed、processing 或 rejected change")
         if not yes and not click.confirm(
             f"将 {change.id} 移入 .trash？", default=False
         ):
@@ -507,7 +577,7 @@ def list_command(
             items = [
                 item
                 for item in status["changes"]
-                if item["status"] in {"proposed", "implemented"}
+                if item["status"] in {"proposed", "processing", "implemented"}
             ]
             if human:
                 HumanStatus(Console(file=sys.stdout)).changes(items)

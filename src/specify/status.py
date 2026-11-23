@@ -47,7 +47,7 @@ class ProjectStatus:
                 if isinstance(target, dict) and "type" in target and "id" in target
             ]
             tasks = None
-            if change.status in {"proposed", "implemented"}:
+            if change.status in {"processing", "implemented"}:
                 try:
                     parsed = parse_tasks_file(change.path / "tasks.md")
                     tasks = {
@@ -62,6 +62,7 @@ class ProjectStatus:
                     "id": change.id,
                     "kind": change.kind,
                     "status": change.status,
+                    "priority": change.priority,
                     "validation": "valid" if not issues else "invalid",
                     "tasks": tasks,
                     "affects": affects,
@@ -95,7 +96,7 @@ class ProjectStatus:
                     "changes": [
                         change["id"]
                         for change in changes
-                        if change["status"] in {"proposed", "implemented"}
+                        if change["status"] in {"processing", "implemented"}
                         and reference in change["affects"]
                     ],
                     "issues": [issue.as_dict() for issue in issues],
@@ -152,6 +153,7 @@ class HumanStatus:
         tree = Tree(Text("Changes", style="bold"), guide_style="dim")
         state_styles = {
             "proposed": "bold cyan",
+            "processing": "bold blue",
             "implemented": "bold green",
             "rejected": "bold yellow",
         }

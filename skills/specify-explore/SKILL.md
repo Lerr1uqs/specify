@@ -21,6 +21,8 @@ description: 在 Specify 项目中探索需求、Contract 边界和 change 方�
 
 先用 `specify list --spec` 查看 formal spec，必要时用 `specify show <type>:<spec-id>` 阅读完整正文。`specify list` 默认输出活跃 change 的 JSON；`specify status` 查看整个项目，两者都包含 change 的 `id`、`kind`、`status`、`tasks` 与 `affects`。人类终端需要表格时才加 `--human`。如果用户提到具体 change，读取它的 `change.md`、`tasks.md`、`meta-data.yaml` 与 delta，再看关联的代码。
 
+用 `rg` 搜索正文或用 `rg --files` 找文件时，加上 `-g '!**/.history/**'` 跳过历史快照目录，例如 `rg -g '!**/.history/**' '<关键词>' spec/`。需要查看 Contract 的历史版本时，优先运行 `specify history <type>:<spec-id>:<contract-id> --limit 5`，默认读取结构化 JSON。需要在终端展示时可加 `--human`，需要比较两版时可用 `--diff <起始版本号> <结束版本号>`。
+
 若当前目录没有 `spec/config.yaml`，先从用户指定的路径找项目；没有 Specify 项目时仍可讨论问题，但不要假装已查过正式规范。`specify init` 是创建项目的操作，只有用户确实要初始化时才运行。
 
 ## 常见入口

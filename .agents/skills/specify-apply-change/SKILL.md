@@ -1,13 +1,13 @@
 ---
 name: specify-apply-change
-description: 实施 Specify proposed change 中的 tasks，并在开始实施前核对 Contract 基线。适用于用户要求开始或继续实现一个已有 change 时。
+description: 实施 Specify processing change 中的 tasks，并在开始实施前核对 Contract 基线。适用于用户要求开始或继续实现一个已有 change 时。
 ---
 
 # 实施 Specify change
 
 如果还不熟悉这个项目，先运行 `specify list --spec` 查看全部正式 spec，再用相对路径和简介定位相关正文。
 
-根据用户给出的 ID 或上下文定位 `spec/changes/proposed/<kind>/<change-id>/`。若有多个可能目标且无法判断，先列出候选 change 并请用户选择。读取 `change.md`、`tasks.md`、`meta-data.yaml`、所有 delta 与相关 formal spec。命令默认作用于当前目录；在本仓库源码中可用 `uv run specify` 替代 `specify`。
+根据用户给出的 ID 或上下文定位 change，先区分 proposed 与 processing。若有多个可能目标且无法判断，先列出候选 change 并请用户选择。读取 `change.md`、`tasks.md`、`meta-data.yaml`、所有 delta 与相关 formal spec。命令默认作用于当前目录；在本仓库源码中可用 `uv run specify` 替代 `specify`。
 
 **每次开始实施前**运行 `specify change verify <change-id>`。若报告 Contract 正文基线变化，先阅读最新 formal spec，重新审查 change 的目标和 delta，按新正文调整 delta，再显式运行 `specify change baseline <change-id>` 和 `specify change verify <change-id>`。不要只重捕 hash 来消除错误；必要时同步调整 tasks 和已经写好的实现。
 
@@ -17,13 +17,14 @@ description: 实施 Specify proposed change 中的 tasks，并在开始实施前
 
 ## 选择 change 并了解进度
 
-用户给出 ID 时直接定位；未给出时先从对话推断。`specify status` 默认提供 JSON，可读取 `changes` 中的 `id`、`kind`、`status`、`validation`、`tasks`。只有一个明确的 proposed change 时可直接使用；多个候选且上下文不足时，列出名称与进度，请用户选目标。开始时告知本次使用的 change ID 与路径。
+用户给出 ID 时直接定位；未给出时先从对话推断。`specify status` 默认提供 JSON，可读取 `changes` 中的 `id`、`kind`、`status`、`validation`、`tasks`。只有一个明确的 processing change 时可直接使用；多个候选且上下文不足时，列出名称与进度，请用户选目标。开始时告知本次使用的 change ID 与路径。
 
 先判断生命周期状态：
 
 | 状态 | 处理 |
 | --- | --- |
-| `proposed` | 读取材料并实施未完成的 tasks |
+| `proposed` | 读取需求；获准开始工作后使用 `specify change process <id>` 进入拆解 |
+| `processing` | 核对需求、设计、实现方案和任务，确认范围与基线后实施 |
 | `implemented` | 核对是否已有未汇报的实现；同步和归档属于下一阶段 |
 | `rejected`、`archived` | 不把它当作可实施草稿 |
 
@@ -48,9 +49,9 @@ Specify 没有 OpenSpec 的 schema、artifact graph 或 `instructions apply --js
 
 ## 结束与交接
 
-全部 tasks 完成后，运行针对改动的验证和 `specify change verify <change-id>`，再执行 `specify change implement <change-id>`。CLI 会校验任务完成情况并把目录从 proposed 移到 implemented。报告本次完成的任务、验证结果、最终 `已完成/总数` 和新路径；下一步才是 sync 与 archive。
+全部 tasks 完成后，运行针对改动的验证和 `specify change verify <change-id>`，再执行 `specify change implement <change-id>`。CLI 会校验任务完成情况并把目录从 processing 移到 implemented。报告本次完成的任务、验证结果、最终 `已完成/总数` 和新路径；下一步才是 sync 与 archive。
 
-如果中途遇到阻碍，报告已完成项、剩余项、真实错误和可选的下一步，保留 proposed 状态。不要因为本次对话结束就把未完成任务标成完成。
+如果中途遇到阻碍，报告已完成项、剩余项、真实错误和可选的下一步，保留 processing 状态。不要因为本次对话结束就把未完成任务标成完成。
 
 ## 进度表达示例
 

@@ -5,6 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+CHANGE_PRIORITIES = ("P0", "P1", "P2", "P3", "P4")
+DEFAULT_CHANGE_PRIORITY = "P2"
+
 
 @dataclass(frozen=True)
 class Contract:
@@ -60,6 +63,17 @@ class Change:
     status: str
     path: Path
     metadata: dict[str, object] = field(default_factory=dict)
+
+    @property
+    def priority(self) -> str:
+        """返回展示用的优先级，兼容早期未记录优先级的 change。"""
+
+        value = self.metadata.get("priority")
+        return (
+            value
+            if isinstance(value, str) and value in CHANGE_PRIORITIES
+            else DEFAULT_CHANGE_PRIORITY
+        )
 
 
 @dataclass(frozen=True)

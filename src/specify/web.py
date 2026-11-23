@@ -25,7 +25,14 @@ from .errors import SpecifyError
 from .history import ContractHistory, ContractRef, HistoryRecord
 from .index import list_specs
 from .merge import apply
-from .models import Change, Contract, DeltaDocument, DeltaOperation, SpecDocument
+from .models import (
+    CHANGE_PRIORITIES,
+    Change,
+    Contract,
+    DeltaDocument,
+    DeltaOperation,
+    SpecDocument,
+)
 from .parse.delta import parse_delta_file
 from .parse.spec import parse_spec_file
 from .parse.tasks import parse_tasks_file
@@ -66,15 +73,41 @@ class ReviewPage:
         """按当前 tab 生成导航和详情；未知引用不进入磁盘读取流程。"""
 
         tab = "change" if "change" in query else "spec"
-        entries = self.changes if tab == "change" else self.specs
-        selected = query.get(tab, [""])[0] or next(iter(entries), "")
+        cutoff = ""
+        filter_control = ""
+        if tab == "change":
+            cutoff = query.get("priority", [""])[0]
+            if cutoff not in CHANGE_PRIORITIES:
+                cutoff = ""
+            entries = self.change_entries(cutoff)
+            groups = (
+                (item.status, item.id, item.id, item.priority)
+                for item in entries.values()
+            )
+        else:
+            entries = self.specs
+            groups = (
+                (ref.split(":", 1)[0], ref, ref.split(":", 1)[1], None)
+                for ref in entries
+            )
+
+        # 当前 change 被筛掉时选中首条匹配项，未知 ID 仍按原规则报错。
+        selected = query.get(tab, [""])[0]
+        if tab == "change" and selected in self.changes and selected not in entries:
+            selected = ""
+        selected = selected or next(iter(entries), "")
+        if tab == "change":
+            filter_control = priority_filter(cutoff, selected)
         status = HTTPStatus.OK
         try:
             if selected and selected not in entries:
                 status = HTTPStatus.NOT_FOUND
                 detail = f'<p class="notice">找不到 {tab}：{escape(selected)}</p>'
             elif not selected:
-                detail = f'<p class="notice">当前项目还没有 {"Change" if tab == "change" else "正式 Spec"}。</p>'
+                if cutoff:
+                    detail = notice("没有符合此优先级筛选的 Change。")
+                else:
+                    detail = f'<p class="notice">当前项目还没有 {"Change" if tab == "change" else "正式 Spec"}。</p>'
             elif tab == "change":
                 detail = self.change_detail(self.changes[selected])
             else:
@@ -82,18 +115,11 @@ class ReviewPage:
         except READ_ERRORS as error:
             detail = notice(error)
 
-        groups = (
-            ((item.status, item.id, item.id) for item in self.changes.values())
-            if tab == "change"
-            else (
-                (ref.split(":", 1)[0], ref, ref.split(":", 1)[1]) for ref in self.specs
-            )
-        )
-        sidebar = "".join(
+        sidebar = filter_control + "".join(
             f"<h2>{escape(group)}</h2><ul>"
             + "".join(
-                f"<li>{link(tab, key, label, key == selected)}</li>"
-                for _, key, label in items
+                f"<li>{link(tab, key, label, key == selected, priority, cutoff)}</li>"
+                for _, key, label, priority in items
             )
             + "</ul>"
             for group, items in groupby(groups, key=lambda item: item[0])
@@ -110,10 +136,29 @@ class ReviewPage:
 <header><div class="frame"><h1>Specify <small>Review</small></h1>
 <p>{escape(self.paths.root.name)} <span class="pill">本地只读</span></p>
 <nav aria-label="视图">{link("spec", "", f"正式 Spec ({len(self.specs)})", tab == "spec")}
-{link("change", "", f"Changes ({len(self.changes)})", tab == "change")}</nav></div></header>
+{link("change", "", f"Changes ({len(self.changes)})", tab == "change", cutoff=cutoff)}</nav></div></header>
 <div class="frame layout"><nav class="sidebar" aria-label="项目列表">{sidebar}</nav>
 <main id="review">{detail}</main></div></body></html>""",
         )
+
+    def change_entries(self, cutoff: str) -> dict[str, Change]:
+        """按状态分组和优先级输出可见 change，同级沿用原扫描顺序。"""
+
+        rank = CHANGE_PRIORITIES.index
+        max_rank = rank(cutoff) if cutoff else len(CHANGE_PRIORITIES) - 1
+        entries: dict[str, Change] = {}
+        for _, changes in groupby(self.changes.values(), key=lambda item: item.status):
+            group = list(changes)
+            for change in group:
+                try:
+                    change.metadata = read_metadata(change)
+                except READ_ERRORS:
+                    # 保留坏草稿的导航入口，选中后由详情展示实际错误。
+                    change.metadata = {}
+            for change in sorted(group, key=lambda item: rank(item.priority)):
+                if rank(change.priority) <= max_rank:
+                    entries[change.id] = change
+        return entries
 
     def spec_detail(self, reference: str, path: Path) -> str:
         """渲染当前 Spec 的简介和每条 Contract 的正文。"""
@@ -133,8 +178,36 @@ class ReviewPage:
     def change_detail(self, change: Change) -> str:
         """读取 change 说明、生命周期及声明的每个目标 Spec。"""
 
-        metadata = read_metadata(change)
+        metadata = change.metadata or read_metadata(change)
         change.metadata = metadata
+        title = str(metadata.get("title") or change.id)
+        header = (
+            f'<p class="eyebrow">{escape(change.status)} · {escape(change.kind)} · {escape(change.id)}</p>'
+            f"<h2>{escape(title)}</h2>"
+        )
+        try:
+            source = (change.path / "change.md").read_text(encoding="utf-8")
+            env: dict[str, object] = {}
+            tokens = self.markdown.parse(source, env)
+            # 总览已经展示名称，省略说明中完全相同的首个一级标题。
+            if (
+                change.status != "proposed"
+                and len(tokens) >= 3
+                and tokens[0].tag == "h1"
+                and tokens[1].content.strip() == title
+            ):
+                tokens = tokens[3:]
+            context = self.markdown.renderer.render(tokens, self.markdown.options, env)
+        except READ_ERRORS as error:
+            context = notice(error)
+
+        # 需求录入只展示正文。实施准备之后才出现任务、影响树和差异。
+        if change.status == "proposed":
+            return (
+                f'{header}<section class="card proposal-document" tabindex="0" '
+                f'aria-label="需求正文">{context}</section>'
+            )
+
         receipt = metadata.get("sync")
         history_id = receipt.get("historyId") if isinstance(receipt, dict) else None
         # 已同步或归档的 delta 不得以最新正文重放；拒绝项只展示声明。
@@ -154,44 +227,47 @@ class ReviewPage:
         ):
             affected = f'<p class="notice">不影响正式 Spec：{escape(str(impact.get("reason", "")))}</p>'
         elif isinstance(targets, list) and targets and impact is None:
-            legend = " ".join(
-                f'<span class="pill {operation.lower()}">{action}</span>'
-                for operation, action in CONTRACT_ACTIONS.items()
-            )
             branches = "".join(
                 f"<li>{self.target_detail(change, target, mode, history_id)}</li>"
                 for target in targets
             )
             # 以 change 为根，右侧按 affects 分出 Spec，再连到各 Contract。
             affected = (
-                f'<p class="notice">{label}</p><p class="impact-legend">连线表示：{legend}</p>'
+                f'<div class="impact-toolbar"><p class="review-mode">{label}</p>'
+                '<button type="button" class="impact-toggle" data-toggle-diffs hidden>展开全部</button></div>'
                 f'<section class="impact-tree" aria-label="Change 影响树">'
                 '<svg class="impact-curves" aria-hidden="true"></svg>'
                 f'<div class="impact-source"><strong>Change</strong><code>{escape(change.id)}</code></div>'
-                f'<ul class="impact-branches" role="list">{branches}</ul></section>'
+                f'<ul class="impact-branches" role="list">{branches}</ul>'
+                '<aside id="current-spec-panel" class="spec-inspector" aria-label="当前 Spec" hidden>'
+                '<button type="button" class="spec-inspector-close" aria-label="收起 Spec" '
+                'title="收起 Spec" data-close-spec><span aria-hidden="true"></span></button>'
+                "<div data-spec-content></div></aside></section>"
             )
+        elif change.status == "processing" and targets is None and impact is None:
+            affected = notice("尚未声明对正式 Spec 的影响。")
+        elif change.status == "rejected" and targets is None and impact is None:
+            affected = ""
         else:
             affected = notice(
                 f"{change.path / 'meta-data.yaml'}：预期非空 affects 列表或 specImpact.kind: none。"
             )
 
-        # 说明尚未写完时不遮住已经存在的 delta。
-        try:
-            context = self.markdown.render(
-                (change.path / "change.md").read_text(encoding="utf-8")
-            )
-        except READ_ERRORS as error:
-            context = notice(error)
         reason = metadata.get("rejectedReason")
         rejection = (
             f'<p class="notice">拒绝原因：{escape(str(reason))}</p>' if reason else ""
         )
+        tasks = self.task_progress(change) if affected else ""
         return (
-            f'<p class="eyebrow">{escape(change.status)} · {escape(change.kind)} · {escape(change.id)}</p>'
-            f"<h2>{escape(str(metadata.get('title') or change.id))}</h2>"
-            f"{self.change_dates(change)}{rejection}"
-            f'<details class="card" data-review-details="description"><summary>变更说明</summary>{context}</details>'
-            f"{self.task_progress(change)}<h3>影响的 Spec</h3>{affected}"
+            f"{header}{self.change_dates(change)}{rejection}"
+            f'<div class="change-overview{" with-tasks" if tasks else ""}">'
+            '<section class="change-description"><h3>变更说明</h3>'
+            f'<div class="description-body">{context}</div></section>{tasks}</div>'
+            + (
+                f'<section class="change-impact"><h3>影响的 Spec</h3>{affected}</section>'
+                if affected
+                else ""
+            )
         )
 
     def change_dates(self, change: Change) -> str:
@@ -236,22 +312,22 @@ class ReviewPage:
             tasks = parse_tasks_file(change.path / "tasks.md")
         except READ_ERRORS as error:
             # 缺失或无效不等于零进度，也不应挡住下方的影响树。
-            return f'<section class="card"><strong>任务进度不可用</strong>{notice(error)}</section>'
+            return f'<section class="task-progress"><h3>任务进度不可用</h3>{notice(error)}</section>'
 
         done = sum(task.done for task in tasks)
         total = len(tasks)
         percent = done * 100 // total
         rows = "".join(
-            f'<li><span class="pill{" added" if task.done else ""}">'
+            f'<li><span class="task-state{" complete" if task.done else ""}">'
             f"{'已完成' if task.done else '待完成'}</span> "
-            f"<code>{escape(task.number)}</code> {escape(task.text)}</li>"
+            f"<span><code>{escape(task.number)}</code> {escape(task.text)}</span></li>"
             for task in tasks
         )
         return (
-            '<details class="card task-progress" data-review-details="tasks"><summary><strong>任务进度</strong> '
-            f'<span class="task-count">已完成 {done} / {total} · {percent}%</span>'
+            '<section class="task-progress"><div class="task-heading"><h3>任务进度</h3>'
+            f'<span class="task-count">已完成 {done} / {total} · {percent}%</span></div>'
             f'<progress aria-label="任务完成进度" value="{done}" max="{total}">{percent}%</progress>'
-            f'</summary><ul class="task-list">{rows}</ul></details>'
+            f'<ul class="task-list">{rows}</ul></section>'
         )
 
     def target_detail(
@@ -311,13 +387,21 @@ class ReviewPage:
                 for contract_id, items in by_id.items()
             )
             rows = f'<ul class="impact-contracts" role="list">{contracts}</ul>{warning}'
-        current = (
-            link("spec", reference, "查看当前 Spec") if reference in self.specs else ""
+        heading = (
+            f'<span class="pill">{SPEC_ACTIONS[action]}</span> '
+            f"<code>{escape(reference)}</code>"
         )
+        current = reference in self.specs
+        if current:
+            url = escape(urlencode({"spec": reference}))
+            heading = (
+                f'<a class="target-current" href="/?{url}" aria-controls="current-spec-panel" '
+                f'aria-expanded="false" data-open-spec>{heading}'
+                '<span class="target-arrow" aria-hidden="true"></span></a>'
+            )
         return (
-            f'<section class="target"><div class="impact-node target-node">'
-            f'<h4><span class="pill">{SPEC_ACTIONS[action]}</span> '
-            f"<code>{escape(reference)}</code></h4>{current}</div>{rows}</section>"
+            f'<section class="target"><div class="impact-node target-node{" has-current" if current else ""}">'
+            f"<h4>{heading}</h4></div>{rows}</section>"
         )
 
     def operation_detail(
@@ -437,8 +521,8 @@ class ReviewPage:
         marker = '<span class="pill stale">已落后当前 Spec</span>' if stale else ""
         return (
             f'<details class="operation" data-review-details="{escape(ref)}">'
-            f"<summary>{marker}{badges} <strong>{escape(items[0].title)}</strong> "
-            f"<code>{escape(contract_id)}</code></summary>{note}{diff or ''}{declared}</details>"
+            f"<summary>{badges} <strong>{escape(items[0].title)}</strong> "
+            f"<code>{escape(contract_id)}</code>{marker}</summary>{note}{diff or ''}{declared}</details>"
         )
 
     def current_contract_notice(
@@ -465,11 +549,54 @@ class ReviewPage:
         )
 
 
-def link(tab: str, key: str, label: str, selected: bool = False) -> str:
-    """生成仅指向站内的链接，并标记当前导航项。"""
+def priority_filter(cutoff: str, change_id: str) -> str:
+    """用可分享的站内链接渲染筛选菜单，并标出当前选项。"""
+
+    options = []
+    for priority in ("", *CHANGE_PRIORITIES):
+        params = {"change": change_id}
+        if priority:
+            params["priority"] = priority
+            badge = f'<span class="priority-badge {priority.lower()}">{priority}</span>'
+            label = f"{badge}<span>及以上</span>"
+        else:
+            label = '<span class="priority-all">全部优先级</span>'
+        current = ' aria-current="true"' if priority == cutoff else ""
+        url = escape(urlencode(params))
+        options.append(
+            f'<li><a href="/?{url}"{current}>{label}'
+            '<span class="priority-check" aria-hidden="true"></span></a></li>'
+        )
+
+    value = f"{cutoff} 及以上" if cutoff else "全部"
+    return (
+        '<details class="priority-filter" data-priority-filter>'
+        '<summary><span class="priority-filter-icon" aria-hidden="true"></span>'
+        f'<span>优先级</span><span class="priority-value">{value}</span>'
+        '<span class="priority-chevron" aria-hidden="true"></span></summary>'
+        f'<ul class="priority-options" aria-label="按优先级筛选">{"".join(options)}</ul></details>'
+    )
+
+
+def link(
+    tab: str,
+    key: str,
+    label: str,
+    selected: bool = False,
+    priority: str | None = None,
+    cutoff: str = "",
+) -> str:
+    """生成站内链接，保留筛选并为 change 标记优先级。"""
 
     current = ' aria-current="page"' if selected else ""
-    return f'<a href="/?{urlencode({tab: key})}"{current}>{escape(label)}</a>'
+    params = {tab: key}
+    if cutoff:
+        params["priority"] = cutoff
+    url = escape(urlencode(params))
+    if priority is not None:
+        badge = f'<span class="priority-badge {priority.lower()}">{priority}</span>'
+        return f'<a class="change-link" href="/?{url}"{current}>{badge}<span>{escape(label)}</span></a>'
+    return f'<a href="/?{url}"{current}>{escape(label)}</a>'
 
 
 def notice(value: object) -> str:

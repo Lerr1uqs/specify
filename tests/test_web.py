@@ -33,9 +33,9 @@ def test_review_shows_dates_from_change_receipt_and_archive_manifest() -> None:
     """各状态只显示已记录的时间，兼容 YAML 时间戳和字符串。"""
 
     page = ReviewPage(RepoPaths(EXAMPLE))
-    _, proposed = page.render({"change": ["show-recovery-delivery-state"]})
-    assert "<dt>创建</dt>" in proposed and "<dt>更新</dt>" in proposed
-    assert "<dt>同步</dt>" not in proposed and "<dt>归档</dt>" not in proposed
+    _, processing = page.render({"change": ["show-recovery-delivery-state"]})
+    assert "<dt>创建</dt>" in processing and "<dt>更新</dt>" in processing
+    assert "<dt>同步</dt>" not in processing and "<dt>归档</dt>" not in processing
 
     _, synced = page.render({"change": ["add-passkey-login"]})
     assert '<dt>同步</dt><dd><time datetime="2026-11-15T14:30:00+08:00">' in synced
@@ -44,6 +44,57 @@ def test_review_shows_dates_from_change_receipt_and_archive_manifest() -> None:
     _, archived = page.render({"change": ["reorganize-auth-files"]})
     assert '<dt>归档</dt><dd><time datetime="2026-11-15T15:00:00+08:00">' in archived
     assert "<dt>同步</dt>" not in archived
+
+
+def test_review_sorts_and_filters_change_priorities(tmp_path: Path) -> None:
+    """同组按优先级排队，P2 筛选包含旧草稿但隐藏 P4。"""
+
+    copytree(EXAMPLE / "spec", tmp_path / "spec")
+    runner = CliRunner()
+    for change_id, priority in (
+        ("show-recovery-delivery-state", "P0"),
+        ("extend-audit-retention-to-90-days", "P4"),
+    ):
+        result = runner.invoke(
+            main, ["--root", str(tmp_path), "change", "priority", change_id, priority]
+        )
+        assert result.exit_code == 0, result.output
+
+    page = ReviewPage(RepoPaths(tmp_path))
+    _, all_changes = page.render({"change": [""]})
+    sidebar = all_changes.split('<nav class="sidebar"', 1)[1].split("</nav>", 1)[0]
+    assert sidebar.index("show-recovery-delivery-state") < sidebar.index(
+        "extend-audit-retention-to-60-days"
+    )
+    assert 'class="priority-badge p0">P0' in sidebar
+    assert 'class="priority-badge p4">P4' in sidebar
+
+    status, filtered = page.render(
+        {"change": ["extend-audit-retention-to-90-days"], "priority": ["P2"]}
+    )
+    assert status == HTTPStatus.OK
+    assert "extend-audit-retention-to-90-days" not in filtered
+    assert '<span class="priority-value">P2 及以上</span>' in filtered
+    assert (
+        'priority=P2" aria-current="true"><span class="priority-badge p2">P2'
+        in filtered
+    )
+    assert 'class="priority-badge p2">P2' in filtered
+    assert (
+        'change=preview-audit-export&amp;priority=P2" aria-current="page"' in filtered
+    )
+
+
+def test_review_proposed_only_renders_requirement() -> None:
+    """待拆解需求直接渲染 Markdown，省去实施状态的任务和影响树。"""
+
+    status, page = ReviewPage(RepoPaths(EXAMPLE)).render(
+        {"change": ["preview-audit-export"]}
+    )
+    assert status == HTTPStatus.OK
+    assert 'class="card proposal-document" tabindex="0"' in page
+    assert "<h2>Requirement</h2>" in page and "预计记录数" in page
+    assert "task-progress" not in page and "impact-tree" not in page
 
 
 def test_review_shows_task_progress_without_conflating_sync(tmp_path: Path) -> None:
@@ -55,6 +106,9 @@ def test_review_shows_task_progress_without_conflating_sync(tmp_path: Path) -> N
     _, pending = page.render({"change": [example]})
     assert 'value="1" max="2">50%</progress>' in pending
     assert "已完成 1 / 2 · 50%" in pending and "待完成" in pending
+    assert '<section class="change-description"><h3>变更说明</h3>' in pending
+    assert '<section class="task-progress">' in pending
+    assert "<h1>显示恢复申请处理进度</h1>" not in pending
     _, complete = page.render({"change": ["explain-delivery-receipt-outcomes"]})
     assert 'value="2" max="2">100%</progress>' in complete and "尚未生效" in complete
 
@@ -126,6 +180,13 @@ def test_review_shows_receipt_lifecycle() -> None:
     _, pending = page.render({"change": ["explain-delivery-receipt-outcomes"]})
     assert "尚未生效" in pending and '<li class="renamed">' in pending
     assert '<span class="insert">+## 查看通知回执' in pending
+    assert "data-toggle-diffs hidden>展开全部</button>" in pending
+    assert (
+        'href="/?spec=capability%3Adelivery-receipts" aria-controls="current-spec-panel"'
+        in pending
+    )
+    assert 'href="/?spec=rule%3Areceipt-retention"' not in pending
+    assert '</ul><aside id="current-spec-panel"' in pending
     _, current = page.render({"spec": ["capability:delivery-receipts"]})
     assert "查询通知回执" in current and "查看通知回执" not in current
     assert (
@@ -188,7 +249,7 @@ def test_review_previews_creating_and_removing_entire_specs(tmp_path: Path) -> N
         ],
     )
     assert result.exit_code == 0, result.output
-    deltas = paths.changes / "proposed/feat/replace-rule/deltas/rule"
+    deltas = paths.changes / "processing/feat/replace-rule/deltas/rule"
     (deltas / "old.md").write_text(
         "# delta\n\n## [REMOVED] [rule] 旧规则\n\n**Reason**: 规则替换。\n\n**Migration**: 使用新规则。\n",
         encoding="utf-8",

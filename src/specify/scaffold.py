@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -9,8 +10,10 @@ from typing import Any
 from .config import dump_yaml, load_yaml, validate_config
 from .errors import SpecifyError, require
 from .io import atomic_write
-from .paths import RepoPaths, scan_changes, validate_id
+from .models import DEFAULT_CHANGE_PRIORITY, Change
+from .paths import STATUSES, RepoPaths, scan_changes, validate_id
 from .spec_metadata import SpecMetadata
+from .validate.changes import read_metadata
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "specTypes": {
@@ -59,7 +62,7 @@ def initialize(root: Path, config_path: Path | None) -> RepoPaths:
     paths = RepoPaths(root)
     paths.specs.mkdir(parents=True, exist_ok=True)
     _install_default_templates(paths)
-    for status in ("proposed", "implemented", "rejected", "archived"):
+    for status in STATUSES:
         (paths.changes / status).mkdir(parents=True, exist_ok=True)
     dump_yaml(paths.config, config)
 
@@ -137,14 +140,92 @@ def create_change(
     kind: str,
     change_id: str,
     affects: tuple[str, ...],
+    priority: str = DEFAULT_CHANGE_PRIORITY,
+    no_spec_impact: str | None = None,
 ) -> Path:
-    """生成单一 change.md、tasks、YAML 元数据和 delta 编辑骨架。"""
+    """默认录入需求，已声明 Spec 影响时直接生成实施草稿。"""
 
     require(kind in config["kinds"], f"未知 change kind：{kind}")
     require(validate_id(change_id), f"change id 必须为 kebab-case：{change_id}")
     if any(change.id == change_id for change in scan_changes(paths)):
         raise SpecifyError(f"change id 已存在：{change_id}")
 
+    plan = _change_plan(config, affects, no_spec_impact)
+    status = "processing" if plan else "proposed"
+
+    target = paths.changes / status / kind / change_id
+    target.mkdir(parents=True)
+    now = datetime.now().astimezone().isoformat(timespec="seconds")
+    metadata: dict[str, Any] = {
+        "id": change_id,
+        "title": change_id.replace("-", " ").title(),
+        "kind": kind,
+        "priority": priority,
+        "createdAt": now,
+        "updatedAt": now,
+        **plan,
+    }
+    dump_yaml(target / "meta-data.yaml", metadata)
+    atomic_write(
+        target / "change.md",
+        "## Requirement\n\n<!-- 说明问题、背景和期望结果。 -->\n",
+    )
+    if plan:
+        _write_plan_files(target, plan.get("affects", []))
+    return target
+
+
+def process_change(
+    paths: RepoPaths,
+    config: dict[str, Any],
+    change: Change,
+    affects: tuple[str, ...],
+    no_spec_impact: str | None,
+) -> Path:
+    """将需求移入 processing，或为尚未确定的实施草稿声明影响范围。"""
+
+    require(
+        change.status in {"proposed", "processing"},
+        "只能处理 proposed 或 processing change",
+    )
+    metadata = read_metadata(change)
+    require((change.path / "change.md").is_file(), "缺少 change.md")
+    plan = _change_plan(config, affects, no_spec_impact)
+    existing = {
+        key: metadata[key] for key in ("affects", "specImpact") if key in metadata
+    }
+    if plan and existing and plan != existing:
+        raise SpecifyError("change 已声明 Spec 影响，请在现有方案中调整")
+
+    # 迁移旧 proposed 时保留已有文件、任务勾选和基线，不要求其通过当前版本验证。
+    _write_plan_files(change.path, plan.get("affects", []))
+    if change.status == "proposed" or (plan and not existing):
+        metadata.update(plan)
+        metadata["updatedAt"] = (
+            datetime.now().astimezone().isoformat(timespec="seconds")
+        )
+        dump_yaml(change.path / "meta-data.yaml", metadata)
+    if change.status == "processing":
+        return change.path
+
+    destination = paths.changes / "processing" / change.kind / change.id
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(change.path), str(destination))
+    return destination
+
+
+def _change_plan(
+    config: dict[str, Any], affects: tuple[str, ...], no_spec_impact: str | None
+) -> dict[str, Any]:
+    """校验 CLI 输入并生成实施草稿的影响范围元数据。"""
+
+    if no_spec_impact is not None:
+        require(not affects, "--affect 与 --no-spec-impact 不能同时使用")
+        reason = no_spec_impact.strip()
+        require(bool(reason), "--no-spec-impact 必须提供非空理由")
+        return {"specImpact": {"kind": "none", "reason": reason}}
+    if not affects:
+        return {}
     parsed = [parse_affect(item) for item in affects]
     require(
         all(spec_type in config["specTypes"] for spec_type, _, _ in parsed),
@@ -152,42 +233,27 @@ def create_change(
     )
     references = [f"{spec_type}:{spec_id}" for spec_type, spec_id, _ in parsed]
     require(len(set(references)) == len(parsed), "affects 中不能重复同一个 spec")
-
-    target = paths.changes / "proposed" / kind / change_id
-    target.mkdir(parents=True)
-    now = datetime.now().astimezone().isoformat(timespec="seconds")
-    metadata: dict[str, Any] = {
-        "id": change_id,
-        "title": change_id.replace("-", " ").title(),
-        "kind": kind,
-        "createdAt": now,
-        "updatedAt": now,
-    }
-    if parsed:
-        metadata["affects"] = [
+    return {
+        "affects": [
             {"type": spec_type, "id": spec_id, "change": operation}
             for spec_type, spec_id, operation in parsed
         ]
-    else:
-        metadata["specImpact"] = {
-            "kind": "none",
-            "reason": "本次 change 不改变任何正式 Contract。",
-        }
-    dump_yaml(target / "meta-data.yaml", metadata)
+    }
 
-    # change.md 按需填写，不预设 proposal/design 的固定章节。
-    atomic_write(
-        target / "change.md",
-        "说明本次 change 的问题、背景和预期结果。简单修复可只保留一句话。\n",
-    )
-    atomic_write(
-        target / "tasks.md",
-        "# tasks\n\n## 1. Implementation\n\n- [ ] 1.1 完成本次变更并复核结果。\n",
-    )
-    for spec_type, spec_id, operation in parsed:
-        path = target / "deltas" / spec_type / f"{spec_id}.md"
-        atomic_write(path, _delta_template(operation))
-    return target
+
+def _write_plan_files(directory: Path, targets: list[dict[str, str]]) -> None:
+    """补齐任务和新声明的 delta 骨架，保留已有文件。"""
+
+    tasks = directory / "tasks.md"
+    if not tasks.exists():
+        atomic_write(
+            tasks,
+            "# tasks\n\n## 1. Implementation\n\n- [ ] 1.1 完成本次变更并复核结果。\n",
+        )
+    for target in targets:
+        path = directory / "deltas" / target["type"] / f"{target['id']}.md"
+        if not path.exists():
+            atomic_write(path, _delta_template(target["change"]))
 
 
 def _delta_template(operation: str) -> str:

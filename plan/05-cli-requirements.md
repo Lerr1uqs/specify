@@ -52,12 +52,13 @@ CLI 根据 targets 创建 `meta-data.yaml` 与对应 delta 骨架；无 `--affec
 
 | Action | 目录效果 |
 |---|---|
-| 创建 change | 创建 `changes/proposed/<kind>/<id>/`。 |
-| 标记已实现 | 完成实现、tasks 与 verify 后，移动到 `changes/implemented/<kind>/<id>/`。该状态允许多个 change 并存。 |
+| 创建 change | 默认创建只含需求和基础元数据的 `proposed`。明确传入 `--affect` 或 `--no-spec-impact` 时直接创建 `processing`。 |
+| 开始拆解 | `change process <id>` 移入 `processing` 并补齐任务骨架，可以声明影响范围。旧方案的已有材料随目录移动。 |
+| 标记已实现 | `processing` 的 tasks 完成并通过 verify 后，移动到 `changes/implemented/<kind>/<id>/`。 |
 | 验证 | 纯机器判定：格式、引用、Contract ID 与 title 的存在性和冲突、`affects`/delta/正式 spec 的对应、checkbox 编号等确定性规则。它不判断“实现是否符合意图”，那是 review 与 agent 的工作。 |
 | 同步 | 用起草基线校验并合并一个 implemented change 的 delta，更新当前 `specs/`，成功后在 change 的 metadata 中记录回执；相同 delta 重复同步为 no-op。 |
-| 拒绝 | 移动到 `changes/rejected/<kind>/<id>/`，写入一行 `rejectedReason`。只接受来自 `proposed/` 的 change。 |
-| 删除 | 将 `changes/proposed/<kind>/<id>/` 或 `changes/rejected/<kind>/<id>/` 移入项目根 `.trash/`。`implemented/` 与 `archived/` 不可删除；移动前必须交互确认。 |
+| 拒绝 | 将 `proposed` 或 `processing` 移入 `rejected` 并写入 `rejectedReason`。 |
+| 删除 | 将 `proposed`、`processing` 或 `rejected` 移入项目根 `.trash/`。默认交互确认。 |
 | 归档 | 要求 verify 成功与 tasks 全部完成；含 delta 时还要求同步回执与当前 delta 一致，然后移动到 `changes/archived/<kind>/YYYY-MM-DD-<id>/`，不重放 delta。 |
 
 状态不能从 metadata 推断，也不能由用户手改 metadata 改变；CLI 应检验 metadata 的 kind 与路径中的 kind 一致。

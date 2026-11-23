@@ -7,13 +7,14 @@
 ## 核心结论
 
 - `specs/` 是当前生效的事实来源，只按可配置的 `type` 分类；不放 `proposed`、`rejected` 或 `archived` 状态。
-- 一次工作是一个 change，路径为 `changes/{status}/{kind}/{title}/`；状态由目录唯一表达，不在 metadata 中重复维护。
+- 一个 change 位于 `changes/{status}/{kind}/{id}/`，状态由目录表达。
 - `kind` 描述为什么改（例如 `feat`、`bugfix`、`refactor`）；`type` 描述被管理的 spec 是什么（例如 `capability`、`component`、`rule`）。
 - 每个 type 的 spec 都由可定位的 **Contract** 条目组成。Contract 取代 OpenSpec 的 capability/requirement 作为统一的内部变更单位。
 - 每个 Contract 在所属 spec 内有显式、稳定的 kebab-case ID；标题可改，ID 不随标题或正文变化。
 - change 仅在改变正式 spec 时拥有 `deltas/`；delta 对 Contract 执行 `ADDED`、`MODIFIED`、`REMOVED`、`RENAMED`。
+- `proposed` 只记录需求。运行 `specify change process` 后进入 `processing`，在该阶段确认影响范围、拆解任务并实施。
 - `implemented` 是已完成但未归档的状态；`specify change sync` 可提前更新 `specs/`，不改变 change 状态。
-- `rejected` 冻结 change 本身，只要求 metadata（含一行 `rejectedReason`）与 `change.md`；不再有价值的 proposed/rejected change 用 `specify change remove` 移入 `.trash/`。
+- `rejected` 保留拒绝原因和现有材料。`specify change remove` 可将 proposed、processing 或 rejected 移入 `.trash/`。
 - 一个 change 只使用 `change.md` 记录上下文与设计；没有固定章节，小修复可写简短说明。若 bugfix 只恢复已有 Contract 行为，不需要 formal spec delta。
 
 ## 延后决策

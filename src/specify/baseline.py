@@ -29,13 +29,15 @@ class BaselineCapture:
     def capture(self, change: Change) -> dict[str, str]:
         """校验 delta 目标后写入当前正文 hash，并返回生成的映射。"""
 
-        if change.status not in {"proposed", "implemented"}:
-            raise SpecifyError("只能为 proposed 或 implemented change 捕获基线")
+        if change.status not in {"processing", "implemented"}:
+            raise SpecifyError("只能为 processing 或 implemented change 捕获基线")
         metadata = read_metadata(change)
         if "sync" in metadata:
             raise SpecifyError("change 已成功 sync；后续语义调整必须另建 change")
         if "affects" not in metadata:
-            raise SpecifyError("无 spec 影响的 change 不需要 Contract 基线")
+            if "specImpact" in metadata:
+                raise SpecifyError("无 spec 影响的 change 不需要 Contract 基线")
+            raise SpecifyError("尚未声明 Spec 影响，无法捕获 Contract 基线")
         if not (change.path / "change.md").is_file():
             raise SpecifyError("缺少 change.md", path=str(change.path))
 

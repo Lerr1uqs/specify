@@ -17,8 +17,8 @@ Specify 项目以 `spec/config.yaml` 为入口。正式规范在 `spec/specs/<ty
 
 ## 修改 Contract
 
-1. 用 `specify change create <kind> <change-id> --affect <type>:<id>:<create|modify|remove>` 创建 change；多个目标重复传入 `--affect`。不影响 formal spec 的 bugfix 可省略 `--affect`。
-2. 编辑生成的 `change.md`、`tasks.md` 和 `deltas/<type>/<id>.md`。写 delta 时查看目标 formal spec 的当前 Contract 内容。
+1. 用 `specify change create <kind> <change-id>` 在 proposed 录入需求，在 `change.md` 写背景、动机和需求。可按内容添加章节。
+2. 用 `specify change process <change-id>` 进入 processing，在同一份 `change.md` 补充设计与实现方案。用 `--affect <type>:<id>:<create|modify|remove>` 声明影响，可重复传入多个目标。无需改变 Contract 时显式用 `--no-spec-impact "原因"`。可在进入 processing 时声明，也可稍后运行同一命令补充。填写 tasks 和必要的 delta，参照正式 Contract。旧 proposed 可用 `process <change-id>` 保留现有材料并迁移。
 3. 对 `MODIFIED`、`REMOVED`、`RENAMED` 的 Contract，在 delta 写好后运行 `specify change baseline <change-id>`。仅含 `ADDED` 操作时无需基线。
 4. **每次开始实现这个 change 前**，先运行 `specify change verify <change-id>`。多个 change 可以基于同一个版本创建；先同步的 change 如果改了后续 change 所依赖的 Contract 正文，后续 change 的 verify 会发现基线已变化。
 5. verify 通过后实现代码并完成 `tasks.md`。同步前再运行一次 verify，然后依次运行 `specify change implement <change-id>`、`specify change sync <change-id>`、`specify change archive <change-id>`。

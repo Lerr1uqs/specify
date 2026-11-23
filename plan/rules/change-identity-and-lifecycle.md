@@ -45,26 +45,26 @@ specs/component/auth/spec.md
 ## 固定状态迁移
 
 ```text
-proposed ──> implemented ──> archived
-    │
-    └──> rejected
+proposed ──> processing ──> implemented ──> archived
+    │             │
+    └─────────────┴──> rejected
 ```
 
 - 禁止 `proposed → archived`、`implemented → rejected`、任何 archived/rejected 回退。
-- 状态只能由 `specify change implement`、`specify change reject`、`specify change archive` 执行的目录移动改变；不从 metadata 读取，也不允许手改 metadata 改变。
+- 状态由目录表达，使用 `specify change process`、`implement`、`reject` 和 `archive` 迁移。
 - `implemented` 表示实现已完成、等待或已经同步、但尚未归档的 change；多个 implemented change 可以并存，不表示互斥的“实施中”。
 - `specify change sync <id>` 不改变状态：它只将一个 implemented change 的 delta 提前合并到正式 spec，供后续 change 和当前事实来源使用。
 
 ## 完成与归档
 
-- 进入 `implemented/` 前，proposal、design、tasks、metadata 和 delta 必须通过格式与引用校验。
+- 从 `processing/` 进入 `implemented/` 前，change.md、tasks、metadata 和需要的 delta 必须通过校验。
 - `specify change verify <id>` 必须成功。它是**纯机器判定**：格式、引用、Contract ID 与 title 的存在性和冲突、`affects`/delta/正式 spec 的对应、任务编号与 checkbox 等确定性规则。它不判断“实现是否符合意图”，那是 review 与 agent 的职责。
 - `tasks.md` 所有 checkbox 必须完成。
 - 只有满足上述条件的 implemented change 可以 archive。含 delta 的 change 还必须先成功 `sync`；archive 核对同步回执后冻结历史，不再次写正式 spec。
 
 ## 拒绝与删除
 
-- `specify change reject <id>` 只接受 `proposed/` 的 change，移动到 `rejected/` 并写入一行 `rejectedReason`。
+- `specify change reject <id>` 接受 `proposed/` 或 `processing/`，移动到 `rejected/` 并写入 `rejectedReason`。
 - rejected change 冻结的是提案本身：不要求 tasks 完成、不要求 `verify` 通过、不要求 delta 合并；其 delta 永不进入 `sync` 或 `archive` 的合并路径。
 - rejected change 只在它的理由仍能阻止一个可能重犯的错误时保留。
-- `specify change remove <id>` 删除整个 change 目录，只接受 `proposed/` 与 `rejected/`。`implemented/` 的结论可能已被 `sync` 写入 `specs/`，`archived/` 是冻结审计，两者都不允许删除。
+- `specify change remove <id>` 将 `proposed/`、`processing/` 或 `rejected/` 的目录移入项目根的 `.trash/`。

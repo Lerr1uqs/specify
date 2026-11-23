@@ -5,7 +5,7 @@
 每次工作位于 `changes/{status}/{kind}/{id}/`。`id` 是全局唯一的 kebab-case 目录名；状态由目录表达，不重复存入 metadata。归档时目录名前加 `YYYY-MM-DD-`，metadata 中的 `id` 保持不变。
 
 ```text
-changes/proposed/feat/add-sms-2fa/
+changes/processing/feat/add-sms-2fa/
 ├── meta-data.yaml
 ├── change.md
 ├── tasks.md
@@ -16,17 +16,17 @@ changes/proposed/feat/add-sms-2fa/
 
 ## `change.md`
 
-每个 change 使用一个 `change.md` 记录问题、上下文、目标，以及需要的设计说明。它合并原来 proposal 与 design 的说明职责，但**没有强制章节或固定模板**：大 change 可以按背景、范围、决策、风险等分段；小修复可以只写一两句话。CLI 不校验其章节结构，只要求文件存在。该文件随 change 保存，不写入正式 spec 或 `spec-index.md`。
+每个 change 使用一个 `change.md` 记录问题、上下文和目标。新 `proposed` 从 `## Requirement` 开始，作者可以在进入 `processing` 后补充设计决策。CLI 只要求文件存在，已有项目可以保留自己的章节结构。
 
 Bugfix 若只是让实现恢复到已有 Contract 的要求，不需要新增或修改 formal spec，也不需要 delta。若修复改变对外行为或 Contract 语义，则必须通过 delta 更新正式 spec。
 
 ## `tasks.md`
 
-`tasks.md` 是可执行工作清单，使用 checkbox 表达完成状态：`- [ ]` 为待办，`- [x]` 为完成。实现前应将每项拆到可检查的大小；实现或归档前要求所有任务完成。
+`tasks.md` 在进入 `processing` 时生成，使用 checkbox 表达完成状态。标记 `implemented` 或归档前要求所有任务完成。
 
 ## `meta-data.yaml`
 
-metadata 是 change 的机器数据来源。它记录身份、时间、kind 和影响目标。`affects` 与 `specImpact` 必须二选一：
+metadata 记录身份、时间、kind、优先级和已声明的影响范围。`proposed` 只需基础元数据。`processing` 可先进入拆解，再确定影响范围。完整验证要求 `affects` 与 `specImpact` 二选一：
 
 - 有正式 Contract 变化时使用 `affects`，每个目标都必须有一个 `deltas/<type>/<spec-id>.md`。
 - 不改变正式 Contract 时使用 `specImpact.kind: none` 并写明原因；不得有 delta、baseline 或 sync receipt。

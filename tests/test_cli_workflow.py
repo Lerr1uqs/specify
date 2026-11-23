@@ -8,7 +8,7 @@ from click.testing import CliRunner, Result
 from pytest import MonkeyPatch
 
 from specify.cli import main
-from specify.config import load_config, validate_config
+from specify.config import load_config, load_yaml, validate_config
 from specify.history_picker import HistoryReferenceCatalog
 from specify.paths import RepoPaths
 from specify.web import ReviewPage
@@ -131,7 +131,16 @@ def test_list_switches_between_change_progress_and_formal_specs(
     runner = CliRunner()
     initialize(runner, tmp_path)
     write_spec(tmp_path, "capability", "auth", "login", "登录", "用户可以登录。")
-    created = invoke(runner, tmp_path, "change", "create", "bugfix", "fix-login")
+    created = invoke(
+        runner,
+        tmp_path,
+        "change",
+        "create",
+        "bugfix",
+        "fix-login",
+        "--no-spec-impact",
+        "仅修复实现。",
+    )
     assert created.exit_code == 0, created.output
 
     listed = invoke(runner, tmp_path, "list")
@@ -147,7 +156,7 @@ def test_list_switches_between_change_progress_and_formal_specs(
     assert human_list.exit_code == 0
     assert human_list.output.splitlines() == [
         "Changes",
-        "└── proposed",
+        "└── processing",
         "    └── bugfix",
         "        └── fix-login  valid · 0/1 tasks",
     ]
@@ -195,6 +204,69 @@ def test_list_switches_between_change_progress_and_formal_specs(
         conflict = invoke(runner, tmp_path, "--json", command, "--human")
         assert conflict.exit_code == 2
         assert "不能同时使用" in conflict.output
+
+
+def test_change_priority_is_editable_until_archive(tmp_path: Path) -> None:
+    """CLI 持久化优先级，旧元数据继续兼容，归档拒绝修改。"""
+
+    runner = CliRunner()
+    initialize(runner, tmp_path)
+    assert (
+        invoke(runner, tmp_path, "change", "create", "feat", "default-order").exit_code
+        == 0
+    )
+    default = tmp_path / "spec/changes/proposed/feat/default-order/meta-data.yaml"
+    assert load_yaml(default)["priority"] == "P2"
+    default.write_text(default.read_text().replace("priority: P2\n", ""))
+    assert invoke(runner, tmp_path, "change", "verify", "default-order").exit_code == 0
+    assert (
+        json.loads(invoke(runner, tmp_path, "list").output)["changes"][0]["priority"]
+        == "P2"
+    )
+
+    result = invoke(
+        runner,
+        tmp_path,
+        "change",
+        "create",
+        "feat",
+        "explicit-order",
+        "--priority",
+        "P1",
+    )
+    assert result.exit_code == 0, result.output
+    proposed = tmp_path / "spec/changes/proposed/feat/explicit-order"
+    assert load_yaml(proposed / "meta-data.yaml")["priority"] == "P1"
+    result = invoke(runner, tmp_path, "change", "priority", "explicit-order", "P00")
+    assert result.exit_code == 2
+    result = invoke(
+        runner,
+        tmp_path,
+        "change",
+        "process",
+        "explicit-order",
+        "--no-spec-impact",
+        "仅演示优先级。",
+    )
+    assert result.exit_code == 0, result.output
+    complete_tasks(tmp_path / "spec/changes/processing/feat/explicit-order")
+    assert (
+        invoke(runner, tmp_path, "change", "implement", "explicit-order").exit_code == 0
+    )
+    assert (
+        invoke(runner, tmp_path, "change", "priority", "explicit-order", "P0").exit_code
+        == 0
+    )
+    assert (
+        invoke(runner, tmp_path, "change", "archive", "explicit-order").exit_code == 0
+    )
+
+    archived = next((tmp_path / "spec/changes/archived/feat").glob("*/meta-data.yaml"))
+    before = archived.read_bytes()
+    result = invoke(runner, tmp_path, "change", "priority", "explicit-order", "P4")
+    assert result.exit_code == 1 and "已归档" in result.output
+    assert load_yaml(archived)["priority"] == "P0"
+    assert archived.read_bytes() == before
 
 
 def test_spec_description_updates_index_and_rich_list(tmp_path: Path) -> None:
@@ -381,7 +453,9 @@ def test_cli_actions_and_no_impact_lifecycle(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0, result.output
     change_dir = tmp_path / "spec/changes/proposed/bugfix/fix-internal-cache"
-    assert (change_dir / "change.md").is_file()
+    assert (change_dir / "change.md").read_text().startswith("## Requirement")
+    assert not (change_dir / "tasks.md").exists()
+    assert "specImpact" not in load_yaml(change_dir / "meta-data.yaml")
     assert not (change_dir / "proposal.md").exists()
     assert not (change_dir / "design.md").exists()
     assert (
@@ -396,12 +470,31 @@ def test_cli_actions_and_no_impact_lifecycle(tmp_path: Path) -> None:
         invoke(runner, tmp_path, "change", "verify", "fix-internal-cache").exit_code
         == 0
     )
-    # tasks 尚未全部完成时，proposed change 不能进入 implemented。
+    # 先进入 processing，再声明影响范围，任务完成后才能标记为 implemented。
     assert (
         invoke(runner, tmp_path, "change", "implement", "fix-internal-cache").exit_code
         == 1
     )
 
+    changed = invoke(runner, tmp_path, "change", "process", "fix-internal-cache")
+    assert changed.exit_code == 0, changed.output
+    change_dir = tmp_path / "spec/changes/processing/bugfix/fix-internal-cache"
+    pending = invoke(runner, tmp_path, "change", "verify", "fix-internal-cache")
+    assert pending.exit_code == 1 and "尚未声明 Spec 影响" in pending.output
+    changed = invoke(
+        runner,
+        tmp_path,
+        "change",
+        "process",
+        "fix-internal-cache",
+        "--no-spec-impact",
+        "仅修复现有实现。",
+    )
+    assert changed.exit_code == 0, changed.output
+    assert (
+        invoke(runner, tmp_path, "change", "implement", "fix-internal-cache").exit_code
+        == 1
+    )
     complete_tasks(change_dir)
     assert (
         invoke(runner, tmp_path, "change", "implement", "fix-internal-cache").exit_code
@@ -497,6 +590,50 @@ def test_cli_actions_and_no_impact_lifecycle(tmp_path: Path) -> None:
     assert invoke(runner, tmp_path, "validate", "--archived").exit_code == 1
 
 
+def test_process_migrates_existing_proposal_without_recapturing_baseline(
+    tmp_path: Path,
+) -> None:
+    """旧方案迁移保留正文、任务和过期基线，重试也不会清空它们。"""
+
+    runner = CliRunner()
+    initialize(runner, tmp_path)
+    spec = write_spec(tmp_path, "capability", "login", "login", "登录", "原文。")
+    result = invoke(
+        runner,
+        tmp_path,
+        "change",
+        "create",
+        "feat",
+        "legacy-login",
+        "--affect",
+        "capability:login:modify",
+    )
+    assert result.exit_code == 0, result.output
+    group = tmp_path / "spec/changes"
+    target = group / "processing/feat/legacy-login"
+    delta = Path("deltas/capability/login.md")
+    (target / delta).write_text("# delta\n\n## [MODIFIED] [login] 登录\n\n计划正文。\n")
+    complete_tasks(target)
+    assert invoke(runner, tmp_path, "change", "baseline", "legacy-login").exit_code == 0
+    baseline = load_yaml(target / "meta-data.yaml")["baseVersions"]
+    files = {
+        name: (target / name).read_bytes() for name in ("change.md", "tasks.md", delta)
+    }
+    legacy = group / "proposed/feat/legacy-login"
+    legacy.parent.mkdir(parents=True)
+    target.rename(legacy)
+    spec.write_text(spec.read_text().replace("原文。", "其他变更已经同步。"))
+
+    for _ in range(2):
+        result = invoke(runner, tmp_path, "change", "process", "legacy-login")
+        assert result.exit_code == 0, result.output
+    assert not legacy.exists()
+    assert {name: (target / name).read_bytes() for name in files} == files
+    assert load_yaml(target / "meta-data.yaml")["baseVersions"] == baseline
+    result = invoke(runner, tmp_path, "change", "verify", "legacy-login")
+    assert result.exit_code == 1 and "基线已变化" in result.output
+
+
 def test_sync_conflict_rejects_every_target_before_writing(tmp_path: Path) -> None:
     """验证多目标中任一基线冲突时，所有 spec 和 sync receipt 都保持原样。"""
 
@@ -527,7 +664,7 @@ def test_sync_conflict_rejects_every_target_before_writing(tmp_path: Path) -> No
         "component:auth-service:modify",
     )
     assert result.exit_code == 0, result.output
-    change_dir = tmp_path / "spec/changes/proposed/feat/add-passkey"
+    change_dir = tmp_path / "spec/changes/processing/feat/add-passkey"
     (change_dir / "deltas/capability/login.md").write_text(
         "# delta\n\n## [MODIFIED] [login] 登录\n\n用户可用密码或通行密钥登录。\n",
         encoding="utf-8",
@@ -683,7 +820,7 @@ def test_post_sync_delta_edit_is_rejected_and_archive_does_not_replay(
         "capability:login:create",
     )
     assert result.exit_code == 0, result.output
-    change_dir = tmp_path / "spec/changes/proposed/feat/add-login"
+    change_dir = tmp_path / "spec/changes/processing/feat/add-login"
     delta = change_dir / "deltas/capability/login.md"
     delta.write_text(
         "# delta\n\n## [ADDED] [login] 登录\n\n用户可以登录。\n", encoding="utf-8"
@@ -725,7 +862,7 @@ def implement_history_change(
         f"capability:login:{operation}",
     )
     assert result.exit_code == 0, result.output
-    change_dir = root / "spec/changes/proposed/feat" / change_id
+    change_dir = root / "spec/changes/processing/feat" / change_id
     (change_dir / "deltas/capability/login.md").write_text(
         f"# delta\n\n{delta}\n", encoding="utf-8"
     )
@@ -921,19 +1058,21 @@ def test_review_preserves_baseline_when_another_change_syncs(tmp_path: Path) -> 
     runner = CliRunner()
     initialize(runner, tmp_path)
     path = write_spec(tmp_path, "capability", "login", "session", "会话", "共同正文。")
+    result = invoke(runner, tmp_path, "change", "create", "feat", "draft-session")
+    assert result.exit_code == 0, result.output
     result = invoke(
         runner,
         tmp_path,
         "change",
-        "create",
-        "feat",
+        "process",
         "draft-session",
         "--affect",
         "capability:login:modify",
     )
     assert result.exit_code == 0, result.output
     delta = (
-        tmp_path / "spec/changes/proposed/feat/draft-session/deltas/capability/login.md"
+        tmp_path
+        / "spec/changes/processing/feat/draft-session/deltas/capability/login.md"
     )
     delta.write_text(
         "# delta\n\n## [MODIFIED] [session] 会话\n\n草稿正文。\n", encoding="utf-8"

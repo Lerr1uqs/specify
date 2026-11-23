@@ -11,7 +11,7 @@ from ..config import load_yaml
 from ..contract import ContractIdentity
 from ..errors import SpecifyError
 from ..merge import DeltaMerger
-from ..models import Change, DeltaDocument, Issue, SpecDocument
+from ..models import CHANGE_PRIORITIES, Change, DeltaDocument, Issue, SpecDocument
 from ..parse.delta import parse_delta_file
 from ..parse.spec import parse_spec_file
 from ..parse.tasks import parse_tasks_file
@@ -54,6 +54,14 @@ class ChangeValidator:
             change.metadata = metadata
             self._validate_context_document(change)
             self._validate_status_fields(change, metadata)
+            self._validate_identity_and_times(change, metadata)
+
+            # 需求录入阶段只校验身份和说明。拒绝的需求也可能尚未完成拆解。
+            if change.status == "proposed" or (
+                change.status == "rejected"
+                and not {"affects", "specImpact"} & metadata.keys()
+            ):
+                return []
             targets = self._validate_metadata(change, metadata)
 
             if change.status != "rejected":
@@ -99,10 +107,13 @@ class ChangeValidator:
     ) -> dict[str, dict[str, Any]]:
         """校验 affects/specImpact 二选一，并返回按 spec 引用索引的目标。"""
 
-        self._validate_identity_and_times(change, metadata)
         has_affects = "affects" in metadata
         has_impact = "specImpact" in metadata
-        if has_affects == has_impact:
+        if not has_affects and not has_impact:
+            raise SpecifyError(
+                "尚未声明 Spec 影响，请通过 change process 指定 --affect 或 --no-spec-impact"
+            )
+        if has_affects and has_impact:
             raise SpecifyError(
                 "meta-data.yaml 必须且只能包含 affects 或 specImpact 之一"
             )
@@ -154,6 +165,7 @@ class ChangeValidator:
             "id",
             "title",
             "kind",
+            "priority",
             "createdAt",
             "updatedAt",
             "affects",
@@ -171,6 +183,8 @@ class ChangeValidator:
             raise SpecifyError("metadata title 必须是非空文本")
         if change.kind not in self.config["kinds"]:
             raise SpecifyError(f"change kind 未在 config.yaml 中声明：{change.kind}")
+        if "priority" in metadata and metadata["priority"] not in CHANGE_PRIORITIES:
+            raise SpecifyError(f"priority 必须是 {', '.join(CHANGE_PRIORITIES)} 之一")
 
         created = self._parse_timestamp(metadata.get("createdAt"), "createdAt")
         updated = self._parse_timestamp(metadata.get("updatedAt"), "updatedAt")
