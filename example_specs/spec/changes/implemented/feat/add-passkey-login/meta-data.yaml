@@ -22,3 +22,4 @@ sync:
   deltaHashes:
     "capability/user-auth.md": "073f86e68b8033c1ecd39f8cbde895e30c0304e22af75d3c2def579584a0f20f"
     "component/auth-service.md": "4dcda53c0976adae2d112cfaefed077554103941e5f7bd7ad1bad4e48dc4716d"
+  historyId: 2c34ca6d3a5444519682079c57275cda

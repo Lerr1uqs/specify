@@ -30,6 +30,10 @@ nav a[aria-current] { font-weight: 700; }
 main { overflow-wrap: anywhere; }
 main h2 { margin: 0; }
 .eyebrow { color: var(--muted); margin: 0 0 4px; }
+.change-dates { display: flex; flex-wrap: wrap; gap: 4px 22px; margin: 8px 0 12px; font-size: 0.875rem; }
+.change-dates > div { display: flex; flex-wrap: wrap; gap: 0 6px; }
+.change-dates dt, .change-dates time span { color: var(--muted); }
+.change-dates dd { margin: 0; font-variant-numeric: tabular-nums; }
 .card { background: #fff; border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin: 12px 0; }
 .card h3, .card h4 { margin: 4px 0; }
 summary { cursor: pointer; }
@@ -104,8 +108,49 @@ summary { cursor: pointer; }
 .impact-contracts > .removed::after { border-top-style: dashed; }
 .operation summary { border-left: 3px solid var(--edge); }
 .operation summary > code { color: var(--muted); }
+.operation summary > .stale {
+  float: inline-end;
+  margin-inline-start: 8px;
+  color: #734600;
+  background: #fff1cb;
+}
 .removed > .operation summary > code { color: var(--tone); text-decoration: underline; }
 .notice { border-left: 3px solid #b28846; padding: 6px 10px; background: #fffaed; }
+.contract-link {
+  padding: 0;
+  border: 0;
+  color: var(--accent);
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.contract-dialog {
+  box-sizing: border-box;
+  width: min(680px, calc(100% - 32px));
+  max-height: calc(100% - 32px);
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--ink);
+  overflow: auto;
+}
+.contract-dialog::backdrop { background: rgb(23 38 58 / 48%); }
+.contract-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.contract-dialog-header h3 { margin: 0; }
+.contract-dialog > code { color: var(--muted); }
+.contract-dialog h4 { margin: 16px 0 8px; }
+.contract-close {
+  flex: none;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  color: var(--ink);
+  background: #f2f6f8;
+  font: inherit;
+  cursor: pointer;
+}
 pre { background: #f2f6f8; border-radius: 6px; padding: 8px 10px; overflow: auto; }
 .diff { white-space: pre-wrap; }
 .diff span { display: inline-block; width: 100%; }

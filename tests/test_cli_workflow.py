@@ -11,6 +11,7 @@ from specify.cli import main
 from specify.config import load_config, validate_config
 from specify.history_picker import HistoryReferenceCatalog
 from specify.paths import RepoPaths
+from specify.web import ReviewPage
 
 
 def invoke(runner: CliRunner, root: Path, *args: str) -> Result:
@@ -874,7 +875,7 @@ def test_contract_history_lifecycle_and_views(tmp_path: Path) -> None:
 def test_contract_history_hides_failed_sync_and_preserves_initial_content(
     tmp_path: Path, monkeypatch: MonkeyPatch
 ) -> None:
-    """正式写入失败时隐藏暂存记录，重试只发布一条变更与一条起始记录。"""
+    """正式写入失败时只保留已捕获的基线，重试后发布一条同步变更。"""
 
     runner = CliRunner()
     initialize(runner, tmp_path)
@@ -897,7 +898,7 @@ def test_contract_history_hides_failed_sync_and_preserves_initial_content(
         assert invoke(runner, tmp_path, "change", "sync", "edit-session").exit_code == 3
         reference = "capability:login:session"
         result = invoke(runner, tmp_path, "history", reference)
-        assert json.loads(result.output)["status"] == "empty"
+        assert json.loads(result.output)["record"]["content"] == "旧正文。"
 
     # 重试复用版本编号，下一次重复同步仍然不会追加。
     for _ in range(2):
@@ -912,3 +913,63 @@ def test_contract_history_hides_failed_sync_and_preserves_initial_content(
     assert rows[0]["source"] == "backfill"
     result = invoke(runner, tmp_path, "history", reference, "--limit", "5")
     assert [row["idx"] for row in json.loads(result.output)["records"]] == [1, 2]
+
+
+def test_review_preserves_baseline_when_another_change_syncs(tmp_path: Path) -> None:
+    """同一基线的两个 change 分开显示，后续正文也不会改写归档差异。"""
+
+    runner = CliRunner()
+    initialize(runner, tmp_path)
+    path = write_spec(tmp_path, "capability", "login", "session", "会话", "共同正文。")
+    result = invoke(
+        runner,
+        tmp_path,
+        "change",
+        "create",
+        "feat",
+        "draft-session",
+        "--affect",
+        "capability:login:modify",
+    )
+    assert result.exit_code == 0, result.output
+    delta = (
+        tmp_path / "spec/changes/proposed/feat/draft-session/deltas/capability/login.md"
+    )
+    delta.write_text(
+        "# delta\n\n## [MODIFIED] [session] 会话\n\n草稿正文。\n", encoding="utf-8"
+    )
+    assert (
+        invoke(runner, tmp_path, "change", "baseline", "draft-session").exit_code == 0
+    )
+
+    # 另一个 change 从同样的正文开始，先完成同步与归档。
+    implement_history_change(
+        runner,
+        tmp_path,
+        "edit-session",
+        "modify",
+        "## [MODIFIED] [session] 会话\n\n已同步正文。",
+    )
+    for action in ("sync", "archive"):
+        result = invoke(runner, tmp_path, "change", action, "edit-session")
+        assert result.exit_code == 0, result.output
+
+    page = ReviewPage(RepoPaths(tmp_path))
+    _, pending = page.render({"change": ["draft-session"]})
+    assert "已落后当前 Spec" in pending
+    assert '<span class="delete">-共同正文。' in pending
+    assert '<span class="insert">+草稿正文。' in pending
+    dialog, _, diff = pending.partition("</dialog>")
+    assert "已同步正文。" in dialog
+    assert "已同步正文。" not in diff
+
+    # 再改变正式版本后，归档仍展示那次同步的前后正文。
+    source = path.read_text(encoding="utf-8")
+    path.write_text(
+        source.replace("已同步正文。", "后来更新的正文。"), encoding="utf-8"
+    )
+    _, archived = ReviewPage(RepoPaths(tmp_path)).render({"change": ["edit-session"]})
+    assert "已落后当前 Spec" in archived
+    assert '<span class="delete">-共同正文。' in archived
+    assert '<span class="insert">+已同步正文。' in archived
+    assert "后来更新的正文。" not in archived

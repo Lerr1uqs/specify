@@ -8,8 +8,9 @@ from typing import Any
 from .config import dump_yaml, load_config
 from .contract import ContractIdentity
 from .errors import SpecifyError
+from .history import ContractHistory, ContractRef
 from .merge import DeltaMerger
-from .models import Change, SpecDocument
+from .models import Change, Contract, SpecDocument
 from .parse.delta import parse_delta_file
 from .parse.spec import parse_spec_file
 from .paths import RepoPaths, validate_id
@@ -56,18 +57,24 @@ class BaselineCapture:
                 f"delta 文件与 affects 不匹配：应为 {sorted(expected_paths)}，实际为 {sorted(actual_paths)}"
             )
 
-        baselines: dict[str, str] = {}
+        snapshots: dict[ContractRef, Contract] = {}
         for target in targets:
-            self._capture_target(change, target, config, baselines)
+            self._capture_target(change, target, config, snapshots)
 
-        # YAML 基线只在显式命令调用时更新，verify/sync 都保持只读。
+        # 等所有目标校验通过后，先保存快照，再发布引用这些正文的 hash。
+        captured_at = datetime.now().astimezone()
+        history = ContractHistory(self.paths)
+        for reference, contract in snapshots.items():
+            history.capture_baseline(reference, contract, captured_at)
+        baselines = {
+            ":".join(reference): ContractIdentity.body_hash(contract.body)
+            for reference, contract in snapshots.items()
+        }
         if baselines:
             metadata["baseVersions"] = dict(sorted(baselines.items()))
         else:
             metadata.pop("baseVersions", None)
-        metadata["updatedAt"] = (
-            datetime.now().astimezone().isoformat(timespec="seconds")
-        )
+        metadata["updatedAt"] = captured_at.isoformat(timespec="seconds")
         dump_yaml(change.path / "meta-data.yaml", metadata)
         return baselines
 
@@ -76,9 +83,9 @@ class BaselineCapture:
         change: Change,
         target: dict[str, Any],
         config: dict[str, Any],
-        baselines: dict[str, str],
+        snapshots: dict[ContractRef, Contract],
     ) -> None:
-        """校验一个 spec 的 delta，并为需要旧正文的 ID 记录 hash。"""
+        """校验一个 spec 的 delta，收集需要旧正文的 Contract。"""
 
         spec_type, spec_id, operation = (
             target.get("type"),
@@ -120,9 +127,9 @@ class BaselineCapture:
         for item in delta.operations:
             if item.operation not in {"MODIFIED", "REMOVED", "RENAMED"}:
                 continue
-            contract = current_by_id[item.contract_id]
-            reference = f"{spec_type}:{spec_id}:{contract.id}"
-            baselines[reference] = ContractIdentity.body_hash(contract.body)
+            snapshots[spec_type, spec_id, item.contract_id] = current_by_id[
+                item.contract_id
+            ]
 
 
 def capture_baselines(paths: RepoPaths, change: Change) -> dict[str, str]:

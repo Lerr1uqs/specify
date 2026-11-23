@@ -1,1 +1,2 @@
 {"idx": 1, "action": "add", "date": "2026-11-22 15:49:26+08:00", "changeId": null, "source": "backfill", "title": "恢复审计留存周期", "content": "账号恢复审计事件保留 30 天。到期后的清理以记录时间为准，且不影响仍在处理中的恢复请求。", "historyId": null}
+{"idx": 2, "action": "modify", "date": "2026-11-23 22:50:23+08:00", "changeId": "extend-audit-retention-to-90-days", "source": "sync", "title": "恢复审计留存周期", "content": "账号恢复审计事件保留 90 天。到期后的清理以记录时间为准，且不影响仍在处理中的恢复请求。", "historyId": "ca6b4f0de69c41a1b03dfc0724ca93f4"}

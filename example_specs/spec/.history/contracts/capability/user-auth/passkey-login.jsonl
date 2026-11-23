@@ -1,1 +1,1 @@
-{"idx": 1, "action": "add", "date": "2026-11-22 14:24:26+08:00", "changeId": null, "source": "backfill", "title": "通行密钥登录", "content": "用户可以使用已注册的通行密钥完成身份验证。验证成功后，认证服务签发会话。", "historyId": null}
+{"idx": 1, "action": "add", "date": "2026-11-15 14:30:00+08:00", "changeId": "add-passkey-login", "source": "sync", "title": "通行密钥登录", "content": "用户可以使用已注册的通行密钥完成身份验证。验证成功后，认证服务签发会话。", "historyId": "2c34ca6d3a5444519682079c57275cda"}

@@ -53,6 +53,16 @@ class ArchiveService:
         self._append_manifest(change, destination, manifest)
         return destination
 
+    def archived_at(self, change: Change) -> str | None:
+        """从该 change 的元数据登记项读取归档时间。"""
+
+        path = (change.path / "meta-data.yaml").relative_to(self.manifest_path.parent)
+        for entry in self._read_manifest()["entries"]:
+            if isinstance(entry, dict) and entry.get("path") == path.as_posix():
+                value = entry.get("archivedAt")
+                return value if isinstance(value, str) else None
+        return None
+
     def _require_current_sync_receipt(
         self, change: Change, metadata: dict[str, Any]
     ) -> None:

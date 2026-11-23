@@ -48,7 +48,13 @@ specify init ./my-project
 
 ## 在浏览器中 Review
 
-在项目根目录运行 `specify web`。它会打开默认浏览器，并在终端打印本机地址。试用本仓库示例：
+在包含 `spec/config.yaml` 的项目根目录运行：
+
+```bash
+specify web
+```
+
+从其他目录启动时，可以用 `specify --root ./my-project web` 指定项目。命令会尝试打开默认浏览器，并在终端打印本机地址。浏览器没有自动打开时，复制这个地址即可。试用本仓库示例：
 
 ```bash
 uv run specify --root example_specs web
@@ -56,10 +62,13 @@ uv run specify --root example_specs web
 
 - **正式 Spec**：按 type 浏览当前规范，点击 Spec 查看简介和 Contract 正文。
 - **Changes**：左侧 Change 通过曲线连到右侧各个 Spec；每个 Spec 用树形折线展开到 Contract。红线表示修改、绿线表示新增、紫色虚线表示删除、蓝线表示重命名。点击 Contract 查看逐行 diff。
-- **任务进度**：从 `tasks.md` 读取完成数、总数和百分比，点击进度条所在的卡片展开任务清单。任务全部完成不代表 change 已同步。
-- **差异来源**：未同步的 change 用当前正文预览，基线不匹配时会提示。已同步的 change 比较当次历史快照；没有快照时只展示 delta 声明。已拒绝的 change 不生成生效预览。
+- **时间与任务进度**：Change 标题下方显示已有的创建、更新、同步和归档时间，保留原始时区。展开任务进度卡片可查看 `tasks.md` 中的完成数、总数和任务清单。
+- **差异来源**：未同步的 change 按捕获的基线正文预览。已同步的 change 比较当次同步前后的历史快照。当草稿基线或同步结果落后于当前 Contract 时，标题栏会标出「已落后当前 Spec」。缺少匹配的历史正文时，页面显示 delta 声明。
+- **查看当前正文**：基线过期时，点击提示中的 Contract 引用，弹窗会显示当前正式 Contract 的标题与正文。逐行 diff 保留在变更详情中。
 
-页面只监听本机，不修改项目文件。修改 Markdown 后刷新页面即可，终端按 `Ctrl+C` 停止。
+Web Review 以只读方式监听本机。保存 Markdown 后，前台页面会自动更新并恢复展开项和阅读位置。在启动命令的终端按 `Ctrl+C` 停止。
+
+在示例项目的 **Changes** 中打开 `extend-audit-retention-to-60-days`，展开「恢复审计留存周期」，可同时查看提案的 30 → 60 天 diff 和当前正式规范的 90 天正文。更多用例见 [示例项目 README](example_specs/README.md)。
 
 ## 创建和编写 spec
 
@@ -124,7 +133,7 @@ specify history --human
 
 默认以 JSON 返回当前生命周期的最新版本。`--limit` 查询最近几条记录，`--include-removed` 展开以前的生命周期和删除记录，`--diff` 按 `idx` 比较标题和正文，支持跨生命周期比较。用 `--human` 在终端浏览，用 `--csv` 导出记录。
 
-升级已有项目时运行 `specify history --backfill`，把还没有历史的 Contract 以当前正文补记为 `add`。补录日期为执行时的日期，同步时也会为首次被修改或删除的已有 Contract 自动补一条起始记录。
+升级已有项目时运行 `specify history --backfill`，把还没有历史的 Contract 以当前正文补记为 `add`。捕获基线时会保存当时的正式版本。如果同步前的正文或标题与最近一条历史记录不同，同步也会补存修改前的实际版本。
 
 在 POSIX 终端运行 `specify history --human` 可打开选择器。输入的字符按顺序在整条引用中匹配，可以在同一段内跳着选字，也可以跨段。例如 `touch`、`lts` 和 `kendtouch` 都能找到 `requirement:backend-indicators-signals:line-touch-signal`。列表用颜色区分引用的三段，并突出命中的字符。首屏只显示终端能容纳的条目，按方向键可以滚动，Enter 确认，Esc 取消。
 

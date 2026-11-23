@@ -29,6 +29,23 @@ def test_review_reads_current_specs_and_pending_delta() -> None:
     assert "尚未捕获正文基线" not in change and "正文基线已变化" not in change
 
 
+def test_review_shows_dates_from_change_receipt_and_archive_manifest() -> None:
+    """各状态只显示已记录的时间，兼容 YAML 时间戳和字符串。"""
+
+    page = ReviewPage(RepoPaths(EXAMPLE))
+    _, proposed = page.render({"change": ["show-recovery-delivery-state"]})
+    assert "<dt>创建</dt>" in proposed and "<dt>更新</dt>" in proposed
+    assert "<dt>同步</dt>" not in proposed and "<dt>归档</dt>" not in proposed
+
+    _, synced = page.render({"change": ["add-passkey-login"]})
+    assert '<dt>同步</dt><dd><time datetime="2026-11-15T14:30:00+08:00">' in synced
+    assert "<dt>归档</dt>" not in synced
+
+    _, archived = page.render({"change": ["reorganize-auth-files"]})
+    assert '<dt>归档</dt><dd><time datetime="2026-11-15T15:00:00+08:00">' in archived
+    assert "<dt>同步</dt>" not in archived
+
+
 def test_review_shows_task_progress_without_conflating_sync(tmp_path: Path) -> None:
     """进度取自任务文件；任务无效时仍可查看影响树，完成任务也不等于同步。"""
 
@@ -48,7 +65,7 @@ def test_review_shows_task_progress_without_conflating_sync(tmp_path: Path) -> N
     assert "<progress" not in invalid and 'class="impact-tree"' in invalid
 
 
-def test_review_uses_the_matching_historical_event() -> None:
+def test_review_uses_the_matching_historical_event(tmp_path: Path) -> None:
     """归档删除不被后来的同 ID 新增污染；重命名和改正文共享一份 diff。"""
 
     page = ReviewPage(RepoPaths(EXAMPLE))
@@ -67,13 +84,26 @@ def test_review_uses_the_matching_historical_event() -> None:
     assert '<svg class="impact-curves" aria-hidden="true">' in archived
     assert archived.count('class="impact-contracts"') == 4
     for action in ("modified", "added", "removed"):
-        assert f'<li class="{action}"><details class="operation">' in archived
+        assert f'<li class="{action}"><details class="operation" ' in archived
+    assert "已落后当前 Spec" in archived
     _, restored = page.render({"change": ["restore-recovery-attempt-limits"]})
     assert '<span class="insert">+## 跨入口共享恢复尝试次数' in restored
     assert '<span class="delete">' not in restored
 
-    # 旧版回执没有快照时不能重放，拒绝项也不能假装已经生效。
-    _, legacy = page.render({"change": ["add-passkey-login"]})
+    _, recovered = page.render({"change": ["add-passkey-login"]})
+    assert (
+        '<span class="delete">-认证服务负责验证密码凭据，并返回认证结果。' in recovered
+    )
+    assert '<span class="insert">+## 通行密钥登录' in recovered
+    assert "没有可还原的当次同步快照" not in recovered
+
+    # 有早期回执但快照丢失时，保留 delta 声明。
+    copytree(EXAMPLE / "spec", tmp_path / "spec")
+    legacy_page = ReviewPage(RepoPaths(tmp_path))
+    path = legacy_page.changes["add-passkey-login"].path / "meta-data.yaml"
+    metadata = path.read_text(encoding="utf-8")
+    path.write_text(metadata.split("  historyId:")[0], encoding="utf-8")
+    _, legacy = legacy_page.render({"change": ["add-passkey-login"]})
     assert "没有可还原的当次同步快照" in legacy and "credential-validation" in legacy
     assert 'class="diff"' not in legacy
     _, rejected = page.render({"change": ["expose-recovery-lookup-result"]})
@@ -119,7 +149,15 @@ def test_review_marks_stale_baselines_and_never_writes(tmp_path: Path) -> None:
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in spec
     assert "<script>" not in spec
     _, change = page.render({"change": ["show-recovery-delivery-state"]})
-    assert "正文基线已变化：capability:account-recovery:request-recovery" in change
+    assert "正文基线已变化：" in change
+    assert 'class="pill stale">已落后当前 Spec' in change
+    assert (
+        "data-current-contract>capability:account-recovery:request-recovery</button>"
+        in change
+    )
+    dialog, _, diff = change.partition("</dialog>")
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in dialog
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" not in diff
     assert {
         file: file.read_bytes() for file in tmp_path.rglob("*") if file.is_file()
     } == before

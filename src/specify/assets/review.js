@@ -42,3 +42,56 @@ class ImpactCurves {
 
 const impactTree = document.querySelector(".impact-tree");
 if (impactTree) new ImpactCurves(impactTree);
+
+/** 用原生弹窗展示当前正文，支持键盘打开和 Escape 关闭。 */
+document.addEventListener("click", (event) => {
+  const trigger = event.target.closest("[data-current-contract]");
+  if (trigger) {
+    document.getElementById(trigger.getAttribute("aria-controls")).showModal();
+  } else if (event.target.closest("[data-close-contract]")) {
+    event.target.closest("dialog").close();
+  }
+});
+
+class ReviewRefresh {
+  /** @param {string} revision 初次生成页面时的项目版本。 */
+  constructor(revision) {
+    this.revision = revision;
+    this.stateKey = `specify-review:${location.search}`;
+    const saved = sessionStorage.getItem(this.stateKey);
+    if (saved) {
+      // 恢复同一页面的展开项和阅读位置，再让连线按新布局重绘。
+      sessionStorage.removeItem(this.stateKey);
+      const { opened, x, y } = JSON.parse(saved);
+      for (const detail of document.querySelectorAll("[data-review-details]")) {
+        detail.open = opened.includes(detail.dataset.reviewDetails);
+      }
+      requestAnimationFrame(() => window.scrollTo(x, y));
+    }
+    window.setTimeout(() => this.check(), 1500);
+  }
+
+  /** 有文件改动时刷新本页，避免后台页签持续请求。 */
+  async check() {
+    try {
+      if (!document.hidden) {
+        const response = await fetch("/revision");
+        if (response.ok && await response.text() !== this.revision) {
+          const opened = [...document.querySelectorAll("[data-review-details][open]")]
+            .map((detail) => detail.dataset.reviewDetails);
+          sessionStorage.setItem(this.stateKey, JSON.stringify({
+            opened, x: window.scrollX, y: window.scrollY,
+          }));
+          location.reload();
+          return;
+        }
+      }
+    } catch {
+      // 本地服务短暂不可用时保留当前页面，下轮继续探测。
+    }
+    window.setTimeout(() => this.check(), 1500);
+  }
+}
+
+const revision = document.querySelector('meta[name="specify-revision"]').content;
+if (revision) new ReviewRefresh(revision);

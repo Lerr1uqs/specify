@@ -43,6 +43,15 @@ uv run specify --root example_specs web
 
 前两项通过 CLI 同步并归档，保留真实回执和版本快照；最后一项故意停在 `implemented`，以便检查尚未生效的预览。还可以打开 `publish-recovery-controls` 查看一次 change 如何影响四份不同类型的 Spec。
 
+### Web Review 中的过期基线
+
+`extend-audit-retention-to-60-days` 和 `extend-audit-retention-to-90-days` 都以 `rule:audit-policy:retention` 的 30 天留存期为基线。90 天版本已通过 CLI 同步，60 天版本留在 `proposed`，用于演示过期基线。
+
+- 打开 60 天 change，展开「恢复审计留存周期」。标题栏显示「已落后当前 Spec」，diff 显示 30 → 60 天。点击提示里的 `rule:audit-policy:retention`，弹窗会显示当前 90 天的正式正文。
+- 打开 90 天 change，历史 diff 显示 30 → 90 天。点「查看当前 Spec」可以看到当前生效的 90 天留存期。
+
+`change verify extend-audit-retention-to-60-days` 和全量 `validate` 会报该提案的基线已变化。可分别运行 `validate --specs` 和 `validate --archived` 核验正式规范和归档。
+
 ## 目录内容
 
 - `spec/config.yaml`：项目允许的 spec type 和 change kind。

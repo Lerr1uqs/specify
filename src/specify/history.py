@@ -98,9 +98,9 @@ class ContractHistory:
                 reference = spec_type, spec_id, contract_id
                 rows = self.read(reference)
 
-                # 已存在的正文保留为首条 add，同步失败时两条记录都暂不可见。
-                if not rows and previous is not None:
-                    rows.append(self._addition(previous, at, change_id, history_id))
+                # 直接编辑过的正式正文也要保留，才能还原本次同步前的实际内容。
+                if previous is not None:
+                    self._append_snapshot(rows, previous, at, change_id, history_id)
                 action: Action = (
                     "add"
                     if previous is None
@@ -122,6 +122,15 @@ class ContractHistory:
                 )
                 self._write(reference, rows)
 
+    def capture_baseline(
+        self, reference: ContractRef, contract: Contract, at: datetime
+    ) -> None:
+        """保存已捕获基线的正式正文，供草稿按 hash 查回。"""
+
+        rows = self.read(reference)
+        if self._append_snapshot(rows, contract, at):
+            self._write(reference, rows)
+
     def backfill(self, config: dict[str, Any], at: datetime) -> int:
         """为还没有历史的现存 Contract 补写一条 add 快照。"""
 
@@ -132,7 +141,9 @@ class ContractHistory:
                 reference = spec_type, spec_id, contract.id
                 # 回填仅补缺失文件，保留已有记录与等待回执的同步快照。
                 if not self._path(reference).is_file():
-                    self._write(reference, [self._addition(contract, at)])
+                    rows: list[HistoryRecord] = []
+                    self._append_snapshot(rows, contract, at)
+                    self._write(reference, rows)
                     count += 1
         return count
 
@@ -164,24 +175,36 @@ class ContractHistory:
         )
 
     @staticmethod
-    def _addition(
+    def _append_snapshot(
+        rows: list[HistoryRecord],
         contract: Contract,
         at: datetime,
         change_id: str | None = None,
         history_id: str | None = None,
-    ) -> HistoryRecord:
-        """用当前观察时间标记已有正文的起始快照。"""
+    ) -> bool:
+        """记录观察到的正式版本，连续相同的标题和正文共用一条快照。"""
 
-        return HistoryRecord(
-            idx=1,
-            action="add",
-            date=at.isoformat(timespec="seconds", sep=" "),
-            changeId=change_id,
-            source="backfill",
-            title=contract.title,
-            content=contract.body,
-            historyId=history_id,
+        latest = rows[-1] if rows else None
+        active = latest is not None and latest["action"] != "remove"
+        if (
+            active
+            and latest["title"] == contract.title
+            and latest["content"] == contract.body
+        ):
+            return False
+        rows.append(
+            HistoryRecord(
+                idx=latest["idx"] + 1 if latest else 1,
+                action="modify" if active else "add",
+                date=at.isoformat(timespec="seconds", sep=" "),
+                changeId=change_id,
+                source="backfill",
+                title=contract.title,
+                content=contract.body,
+                historyId=history_id,
+            )
         )
+        return True
 
     def _write(self, reference: ContractRef, rows: list[HistoryRecord]) -> None:
         """原子写入完整 JSONL，重试时自然替换同一条 Contract 的未生效记录。"""

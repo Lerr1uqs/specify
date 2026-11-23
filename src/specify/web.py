@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import webbrowser
 from collections.abc import Callable, Iterable
+from datetime import datetime
 from difflib import unified_diff
+from hashlib import sha256
 from html import escape
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -16,10 +18,11 @@ from urllib.parse import parse_qs, urlencode
 
 from markdown_it import MarkdownIt
 
+from .archive import ArchiveService
 from .config import load_config
 from .contract import ContractIdentity
 from .errors import SpecifyError
-from .history import ContractHistory, HistoryRecord
+from .history import ContractHistory, ContractRef, HistoryRecord
 from .index import list_specs
 from .merge import apply
 from .models import Change, Contract, DeltaDocument, DeltaOperation, SpecDocument
@@ -57,7 +60,9 @@ class ReviewPage:
         # 不执行项目文档中的 HTML，也不自动加载外部图片。
         self.markdown = MarkdownIt("commonmark", {"html": False}).disable("image")
 
-    def render(self, query: dict[str, list[str]]) -> tuple[HTTPStatus, str]:
+    def render(
+        self, query: dict[str, list[str]], revision: str = ""
+    ) -> tuple[HTTPStatus, str]:
         """按当前 tab 生成导航和详情；未知引用不进入磁盘读取流程。"""
 
         tab = "change" if "change" in query else "spec"
@@ -98,6 +103,7 @@ class ReviewPage:
             f"""<!doctype html>
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="specify-revision" content="{escape(revision)}">
 <title>Specify · Review</title><link rel="stylesheet" href="/review.css">
 <script src="/review.js" defer></script></head>
 <body><a class="skip" href="#review">跳到详情</a>
@@ -137,7 +143,7 @@ class ReviewPage:
         elif change.status == "archived" or receipt is not None:
             mode, label = "history", "历史差异 · 读取当次同步快照"
         else:
-            mode, label = "preview", "未同步 · 以当前正式 Spec 预览，尚未生效"
+            mode, label = "preview", "未同步 · 按捕获的 Contract 基线预览，尚未生效"
 
         impact = metadata.get("specImpact")
         targets = metadata.get("affects")
@@ -182,10 +188,46 @@ class ReviewPage:
         )
         return (
             f'<p class="eyebrow">{escape(change.status)} · {escape(change.kind)} · {escape(change.id)}</p>'
-            f"<h2>{escape(str(metadata.get('title') or change.id))}</h2>{rejection}"
-            f'<details class="card"><summary>变更说明</summary>{context}</details>'
+            f"<h2>{escape(str(metadata.get('title') or change.id))}</h2>"
+            f"{self.change_dates(change)}{rejection}"
+            f'<details class="card" data-review-details="description"><summary>变更说明</summary>{context}</details>'
             f"{self.task_progress(change)}<h3>影响的 Spec</h3>{affected}"
         )
+
+    def change_dates(self, change: Change) -> str:
+        """用元数据和回执渲染已有的时间，保留记录的时区。"""
+
+        metadata = change.metadata
+        receipt = metadata.get("sync")
+        dates = [
+            ("创建", metadata.get("createdAt")),
+            ("更新", metadata.get("updatedAt")),
+            ("同步", receipt.get("appliedAt") if isinstance(receipt, dict) else None),
+        ]
+        warning = ""
+        if change.status == "archived":
+            try:
+                dates.append(("归档", ArchiveService(self.paths).archived_at(change)))
+            except READ_ERRORS as error:
+                # 清单读取失败时保留其余时间和 change 内容。
+                warning = notice(error)
+
+        rows = []
+        for label, value in dates:
+            # YAML 时间戳既可能是 datetime，也可能是加引号的字符串。
+            if isinstance(value, str):
+                try:
+                    value = datetime.fromisoformat(value)
+                except ValueError:
+                    continue
+            if isinstance(value, datetime) and value.utcoffset() is not None:
+                timestamp = value.isoformat(timespec="seconds")
+                rows.append(
+                    f'<div><dt>{label}</dt><dd><time datetime="{timestamp}">'
+                    f"{value:%Y-%m-%d %H:%M:%S} <span>{timestamp[19:]}</span></time></dd></div>"
+                )
+        metadata_html = f'<dl class="change-dates">{"".join(rows)}</dl>' if rows else ""
+        return metadata_html + warning
 
     def task_progress(self, change: Change) -> str:
         """从 tasks.md 计算完成度；任务进度不代表已经同步。"""
@@ -206,7 +248,7 @@ class ReviewPage:
             for task in tasks
         )
         return (
-            '<details class="card task-progress"><summary><strong>任务进度</strong> '
+            '<details class="card task-progress" data-review-details="tasks"><summary><strong>任务进度</strong> '
             f'<span class="task-count">已完成 {done} / {total} · {percent}%</span>'
             f'<progress aria-label="任务完成进度" value="{done}" max="{total}">{percent}%</progress>'
             f'</summary><ul class="task-list">{rows}</ul></details>'
@@ -239,13 +281,18 @@ class ReviewPage:
         except READ_ERRORS as error:
             rows = notice(error)
         else:
-            preview = None
+            current_contracts: dict[str, Contract] | None = {}
             warning = ""
-            if mode == "preview":
-                try:
-                    preview = self.preview(reference, action, delta)
-                except READ_ERRORS as error:
-                    warning = notice(error)
+            current_path = self.specs.get(reference)
+            try:
+                if current_path is not None and mode != "rejected":
+                    current_contracts = {
+                        item.id: item
+                        for item in parse_spec_file(current_path).contracts
+                    }
+            except READ_ERRORS as error:
+                current_contracts = None
+                warning = notice(error)
             by_id: dict[str, list[DeltaOperation]] = {}
             for item in delta.operations:
                 by_id.setdefault(item.contract_id, []).append(item)
@@ -253,7 +300,12 @@ class ReviewPage:
             contracts = "".join(
                 f'<li class="{items[-1].operation.lower()}">'
                 + self.operation_detail(
-                    change, (kind, name, contract_id), items, mode, history_id, preview
+                    change,
+                    (kind, name, contract_id),
+                    items,
+                    mode,
+                    history_id,
+                    current_contracts,
                 )
                 + "</li>"
                 for contract_id, items in by_id.items()
@@ -268,34 +320,14 @@ class ReviewPage:
             f"<code>{escape(reference)}</code></h4>{current}</div>{rows}</section>"
         )
 
-    def preview(
-        self, reference: str, action: str, delta: DeltaDocument
-    ) -> tuple[dict[str, Contract], dict[str, Contract]]:
-        """用和 sync 一样的合并器在内存预览，不补历史、不更新基线。"""
-
-        path = self.specs.get(reference)
-        if (path is None) != (action == "create"):
-            state = "已存在" if path else "不存在"
-            raise SpecifyError(
-                f"无法预览：{reference} 当前{state}，不符合 {action} 的前置条件"
-            )
-        before = parse_spec_file(path) if path else SpecDocument()
-        after = apply(before, delta)
-        if bool(after.contracts) == (action == "remove"):
-            raise SpecifyError(f"无法预览：{reference} 的 delta 结果与 {action} 不一致")
-        return (
-            {item.id: item for item in before.contracts},
-            {item.id: item for item in after.contracts},
-        )
-
     def operation_detail(
         self,
         change: Change,
-        reference: tuple[str, str, str],
+        reference: ContractRef,
         items: list[DeltaOperation],
         mode: str,
         history_id: object,
-        preview: tuple[dict[str, Contract], dict[str, Contract]] | None,
+        current_contracts: dict[str, Contract] | None,
     ) -> str:
         """合并同一 Contract 的重命名和修改，用一份 diff 展示净变化。"""
 
@@ -307,23 +339,52 @@ class ReviewPage:
         )
         diff: str | None = None
         note = ""
-        if preview is not None:
-            before, after = (side.get(contract_id) for side in preview)
-            diff = line_diff(contract_lines(before), contract_lines(after))
-            if before is not None:
-                baselines = change.metadata.get("baseVersions")
-                digest = baselines.get(ref) if isinstance(baselines, dict) else None
-                if digest != ContractIdentity.body_hash(before.body):
-                    explanation = "正文基线已变化" if digest else "尚未捕获正文基线"
+        stale = False
+        current = (current_contracts or {}).get(contract_id)
+        baselines = change.metadata.get("baseVersions")
+        digest = baselines.get(ref) if isinstance(baselines, dict) else None
+        try:
+            if mode == "preview":
+                before = current
+                if items[0].operation == "ADDED":
+                    before = None
+                    stale = current is not None
+                elif digest:
+                    # 标题用于区分正文相同、但已重命名的历史版本。
+                    matches_current = matches_baseline(current, digest, items[0].title)
+                    stale = current_contracts is not None and not matches_current
+                    if not matches_current:
+                        before = find_baseline(
+                            self.history.read(reference),
+                            contract_id,
+                            digest,
+                            items[0].title,
+                        )
+                    if before is None:
+                        note = self.current_contract_notice(
+                            "找不到与基线 hash 匹配的历史正文", ref, current
+                        )
+                    elif stale:
+                        note = self.current_contract_notice(
+                            "正文基线已变化",
+                            ref,
+                            current,
+                            "以下显示基于原始基线的差异。",
+                        )
+                else:
                     note = notice(
-                        f"{explanation}：{ref}。以下仅按当前正文预览，不代表可以同步。"
+                        f"尚未捕获正文基线：{ref}。有当前正文时按当前正文预览。"
                     )
-        elif mode == "history" and history_id:
-            try:
+
+                # 逐条使用各自的历史基线，避免当前 Spec 中的其他 Contract 干扰草稿 diff。
+                if before is not None or items[0].operation == "ADDED":
+                    result = apply(
+                        SpecDocument([before] if before else []), DeltaDocument(items)
+                    )
+                    after = next(iter(result.contracts), None)
+                    diff = line_diff(contract_lines(before), contract_lines(after))
+            elif mode == "history" and history_id:
                 records = self.history.read(reference)
-            except READ_ERRORS as error:
-                note = notice(error)
-            else:
                 for index, record in enumerate(records):
                     # 自动回填可能共用本次回执，但它是变更前状态，不是同步结果。
                     if (
@@ -331,12 +392,30 @@ class ReviewPage:
                         and record["changeId"] == change.id
                         and record["historyId"] == history_id
                     ):
-                        previous = records[index - 1] if index else None
-                        if previous is not None or record["action"] == "add":
-                            diff = line_diff(
-                                history_lines(previous), history_lines(record)
-                            )
+                        after = history_contract(contract_id, record)
+                        stale = current_contracts is not None and after != current
+                        before = (
+                            history_contract(contract_id, records[index - 1])
+                            if index
+                            else None
+                        )
+                        if record["action"] == "add":
+                            diff = line_diff([], contract_lines(after))
+                        else:
+                            # 旧历史可能缺一条紧邻快照，只在本次同步前的记录中按 hash 查找。
+                            if digest and not matches_baseline(
+                                before, digest, items[0].title
+                            ):
+                                before = find_baseline(
+                                    records[:index], contract_id, digest, items[0].title
+                                )
+                            if before is not None:
+                                diff = line_diff(
+                                    contract_lines(before), contract_lines(after)
+                                )
                         break
+        except READ_ERRORS as error:
+            note = notice(error)
 
         # 没有可信的前后快照时，宁可展示声明，也不用当前正式正文猜测历史。
         if diff is None:
@@ -355,9 +434,34 @@ class ReviewPage:
                 for item in items
                 if item.operation == "REMOVED"
             )
+        marker = '<span class="pill stale">已落后当前 Spec</span>' if stale else ""
         return (
-            f'<details class="operation"><summary>{badges} <strong>{escape(items[0].title)}</strong> '
+            f'<details class="operation" data-review-details="{escape(ref)}">'
+            f"<summary>{marker}{badges} <strong>{escape(items[0].title)}</strong> "
             f"<code>{escape(contract_id)}</code></summary>{note}{diff or ''}{declared}</details>"
+        )
+
+    def current_contract_notice(
+        self, message: str, reference: str, contract: Contract | None, suffix: str = ""
+    ) -> str:
+        """提示基线问题，并在当前 Contract 存在时提供正文弹窗。"""
+
+        if contract is None:
+            return notice(f"{message}：{reference}。{suffix}")
+
+        dialog_id = escape(f"current-{reference}")
+        return (
+            f'<p class="notice">{escape(message)}：'
+            f'<button type="button" class="contract-link" aria-haspopup="dialog" '
+            f'aria-controls="{dialog_id}" data-current-contract>{escape(reference)}</button>'
+            f"。{escape(suffix)}</p>"
+            f'<dialog class="contract-dialog" id="{dialog_id}" aria-labelledby="{dialog_id}-title">'
+            '<div class="contract-dialog-header">'
+            f'<h3 id="{dialog_id}-title">当前正式 Contract</h3>'
+            '<button type="button" class="contract-close" data-close-contract autofocus>关闭</button>'
+            "</div>"
+            f"<code>{escape(reference)}</code><h4>{escape(contract.title)}</h4>"
+            f"{self.markdown.render(contract.body)}</dialog>"
         )
 
 
@@ -380,12 +484,35 @@ def contract_lines(contract: Contract | None) -> list[str]:
     return [f"## {contract.title}", "", *contract.body.split("\n")] if contract else []
 
 
-def history_lines(record: HistoryRecord | None) -> list[str]:
-    """把历史删除状态转换成空文件，便于比较重新新增的 Contract。"""
+def history_contract(contract_id: str, record: HistoryRecord) -> Contract | None:
+    """读取历史快照，删除事件没有现存 Contract。"""
 
-    if record is None or record["action"] == "remove":
-        return []
-    return contract_lines(Contract("", record["title"], record["content"]))
+    if record["action"] == "remove":
+        return None
+    return Contract(contract_id, record["title"], record["content"])
+
+
+def matches_baseline(contract: Contract | None, digest: object, title: str) -> bool:
+    """按正文 hash 精确匹配，并用 delta 旧标题区分重命名。"""
+
+    return (
+        contract is not None
+        and ContractIdentity.body_hash(contract.body) == digest
+        and ContractIdentity.normalize_title(contract.title)
+        == ContractIdentity.normalize_title(title)
+    )
+
+
+def find_baseline(
+    records: list[HistoryRecord], contract_id: str, digest: object, title: str
+) -> Contract | None:
+    """从历史中取最近一份与正文 hash 和旧标题一致的快照。"""
+
+    for record in reversed(records):
+        snapshot = history_contract(contract_id, record)
+        if matches_baseline(snapshot, digest, title):
+            return snapshot
+    return None
 
 
 def line_diff(before: Iterable[str], after: Iterable[str]) -> str:
@@ -400,6 +527,25 @@ def line_diff(before: Iterable[str], after: Iterable[str]) -> str:
         for line in lines
     )
     return f'<pre class="diff" aria-label="逐行差异"><code>{content}</code></pre>'
+
+
+def project_revision(paths: RepoPaths) -> str:
+    """为 Review 读取的 Markdown、元数据和历史文件生成变更标记。"""
+
+    digest = sha256()
+    manifest = paths.changes / "archived" / "manifest.json"
+    for path in sorted(paths.spec.rglob("*")):
+        if path.suffix not in {".md", ".yaml", ".jsonl"} and path != manifest:
+            continue
+        try:
+            info = path.stat()
+        except FileNotFoundError:
+            # 编辑器可能在扫描与读取属性之间原子替换或移动文件。
+            continue
+        digest.update(
+            f"{path.relative_to(paths.spec)}\0{info.st_mtime_ns}\0{info.st_size}\n".encode()
+        )
+    return digest.hexdigest()
 
 
 def serve_review(paths: RepoPaths, announce: Callable[[str], None]) -> None:
@@ -427,18 +573,27 @@ def serve_review(paths: RepoPaths, announce: Callable[[str], None]) -> None:
             route, _, query = self.path.partition("?")
             if route == "/":
                 try:
+                    revision = project_revision(paths)
                     status, body = ReviewPage(paths).render(
-                        parse_qs(query, keep_blank_values=True)
+                        parse_qs(query, keep_blank_values=True), revision
                     )
                 except READ_ERRORS as error:
                     status, body = HTTPStatus.INTERNAL_SERVER_ERROR, str(error)
                     self.respond(status, body, "text/plain")
                     return
                 self.respond(status, body, "text/html")
+            elif route == "/revision":
+                self.respond(HTTPStatus.OK, project_revision(paths), "text/plain")
             elif route in static:
                 self.respond(HTTPStatus.OK, *static[route])
             else:
                 self.send_error(HTTPStatus.NOT_FOUND)
+
+        def log_request(self, code: int | str = "-", size: int | str = "-") -> None:
+            """定时探测不占据终端日志，正常页面请求照常记录。"""
+
+            if self.path != "/revision" or code != HTTPStatus.OK:
+                super().log_request(code, size)
 
         def respond(self, status: HTTPStatus, body: str, media_type: str) -> None:
             """只允许同源静态资源，禁止内联脚本、跨站嵌入和缓存。"""
@@ -452,7 +607,7 @@ def serve_review(paths: RepoPaths, announce: Callable[[str], None]) -> None:
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header(
                 "Content-Security-Policy",
-                "default-src 'none'; style-src 'self'; script-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+                "default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
             )
             self.end_headers()
             self.wfile.write(encoded)
