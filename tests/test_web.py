@@ -265,6 +265,152 @@ def test_review_previews_creating_and_removing_entire_specs(tmp_path: Path) -> N
     assert list(page.specs) == ["rule:old"] and formal.is_file()
 
 
+def test_review_search_filters_sidebar_and_highlights_matches() -> None:
+    """搜索只保留命中 Spec，右侧只渲染命中的 Contract 并高亮关键词。"""
+
+    page = ReviewPage(RepoPaths(EXAMPLE))
+    status, html = page.render({"q": ["重置密码"]})
+    assert status == HTTPStatus.OK
+
+    # 查找栏位于标题栏右侧，左栏只保留命中列表，不再重复放表单。
+    header = html.split("</header>", 1)[0]
+    assert 'class="findbar"' in header and "data-spec-search" in header
+    assert 'class="findbar-count"' in header and "1/" in header
+    sidebar = html.split('<nav class="sidebar"', 1)[1].split("</nav>", 1)[0]
+    assert "account-recovery" in sidebar and "audit-policy" not in sidebar
+    assert '<span class="hit-count">1</span>' in sidebar
+    assert "<form" not in sidebar
+
+    main = html.split('<main id="review">', 1)[1]
+    assert "<mark>重置密码</mark>" in main
+    assert "request-recovery" not in main
+    assert "命中 1 / 2 条 Contract" in main
+    assert (
+        '<a class="spec-full-link" href="/?spec=capability%3Aaccount-recovery">' in main
+    )
+    assert '<script src="/pele.js"' not in html
+
+
+def test_review_search_can_limit_spec_type() -> None:
+    """类型下拉把搜索限定在 capability 等指定分组内。"""
+
+    page = ReviewPage(RepoPaths(EXAMPLE))
+    status, html = page.render({"q": ["会话"], "type": ["capability"]})
+    assert status == HTTPStatus.OK
+
+    sidebar = html.split('<nav class="sidebar"', 1)[1].split("</nav>", 1)[0]
+    assert "user-auth" in sidebar
+    assert "auth-service" not in sidebar and "identity-platform" not in sidebar
+    assert '<span class="hit-count">3</span>' in sidebar
+    assert '<option value="capability" selected>' in html
+
+    main = html.split('<main id="review">', 1)[1]
+    assert "user-auth" in main and "auth-service" not in main
+    assert "命中 3 / 3 条 Contract" in main
+
+
+def test_review_search_keeps_current_spec_when_conditions_change() -> None:
+    """条件开关提交保留当前 Spec；当前正文不再命中时回落到第一条命中。"""
+
+    page = ReviewPage(RepoPaths(EXAMPLE))
+    _, html = page.render({"q": ["会话"], "spec": ["capability:user-auth"]})
+    assert 'type="hidden" name="spec" value="capability:user-auth"' in html
+
+    _, fallback = page.render({"q": ["会话"], "spec": ["capability:account-recovery"]})
+    main = fallback.split('<main id="review">', 1)[1]
+    assert "<h2>architecture:event-delivery</h2>" in main
+    assert "该 Spec 没有命中的 Contract" not in main
+
+
+def test_review_search_supports_regex_and_reports_invalid_pattern() -> None:
+    """正则开关保留表达式并高亮整体命中，无效表达式展示可读错误。"""
+
+    page = ReviewPage(RepoPaths(EXAMPLE))
+    status, html = page.render({"q": ["重置.*密码"], "re": ["1"]})
+    assert status == HTTPStatus.OK
+    assert 'name="re" value="1" checked' in html
+    assert 'aria-label="正则表达式"' in html
+    assert "<mark>重置密码</mark>" in html
+
+    status, invalid = page.render({"q": ["("], "re": ["1"]})
+    assert status == HTTPStatus.OK
+    assert "正则表达式无效" in invalid and "0 个 Spec 命中" in invalid
+    assert 'class="search-empty"' not in invalid
+
+
+def test_review_search_supports_case_and_whole_word() -> None:
+    """Aa 区分大小写，wd 要求命中项不与相邻单词字符相连。"""
+
+    page = ReviewPage(RepoPaths(EXAMPLE))
+    _, insensitive = page.render({"q": ["RECOVERY"]})
+    assert "account-recovery" in insensitive
+    assert "0 个 Spec 命中" not in insensitive
+
+    _, sensitive = page.render({"q": ["RECOVERY"], "case": ["1"]})
+    assert "0 个 Spec 命中" in sensitive
+    assert 'name="case" value="1" checked' in sensitive
+    assert 'aria-label="区分大小写"' in sensitive
+
+    _, loose = page.render({"q": ["pass"]})
+    assert "user-auth" in loose
+    _, whole = page.render({"q": ["pass"], "word": ["1"]})
+    assert "0 个 Spec 命中" in whole
+    assert 'name="word" value="1" checked' in whole
+    assert 'name="case" value="1" checked' not in whole
+
+
+def test_review_search_escapes_highlighted_markdown(tmp_path: Path) -> None:
+    """正文中的 HTML 按文本转义，搜索高亮不会生成可执行标签。"""
+
+    copytree(EXAMPLE / "spec", tmp_path / "spec")
+    path = tmp_path / "spec/specs/capability/account-recovery/spec.md"
+    source = path.read_text(encoding="utf-8").replace(
+        "## [reset-password]", "<script>alert(1)</script>\n\n## [reset-password]"
+    )
+    path.write_text(source, encoding="utf-8")
+    page = ReviewPage(RepoPaths(tmp_path))
+    _, html = page.render({"q": ["script"]})
+    main = html.split('<main id="review">', 1)[1]
+    assert "&lt;<mark>script</mark>&gt;alert(1)" in main
+    assert "<script>alert(1)</script>" not in html
+
+
+def test_review_renders_pele_fences_as_mounted_diagrams() -> None:
+    """pele 围栏生成可挂载图表，只有出现图表时才加载本地 Pele 资源。"""
+
+    page = ReviewPage(RepoPaths(EXAMPLE))
+    status, html = page.render({"spec": ["architecture:identity-platform"]})
+    assert status == HTTPStatus.OK
+    assert '<figure class="diagram" data-pele>' in html
+    assert '<details class="diagram-source"><summary>查看图表源码</summary>' in html
+    assert "flowchart LR" in html
+    assert '<script src="/pele.js" defer></script>' in html
+    assert '<script src="/review.js" defer></script>' in html
+
+    # 普通 Spec 不加载图表渲染器。
+    _, plain = page.render({"spec": ["capability:account-recovery"]})
+    assert "data-pele" not in plain and '<script src="/pele.js"' not in plain
+
+    # 图表源码默认折叠，不参与正文高亮和命中步进。
+    _, searched = page.render({"q": ["flowchart"]})
+    assert "命中 1 / 2 条 Contract" in searched
+    assert "diagram-source" in searched and "<mark>flowchart</mark>" not in searched
+
+
+def test_review_keeps_non_diagram_fences_as_code(tmp_path: Path) -> None:
+    """未知语言的围栏仍按普通代码块渲染，不触发图表加载。"""
+
+    copytree(EXAMPLE / "spec", tmp_path / "spec")
+    path = tmp_path / "spec/specs/capability/account-recovery/spec.md"
+    source = path.read_text(encoding="utf-8")
+    path.write_text(source + "\n```python\nprint('hello')\n```\n", encoding="utf-8")
+    page = ReviewPage(RepoPaths(tmp_path))
+    _, html = page.render({"spec": ["capability:account-recovery"]})
+    assert '<code class="language-python">' in html
+    assert "data-pele" not in html
+    assert '<script src="/pele.js"' not in html
+
+
 def test_web_command_and_unknown_reference(monkeypatch: MonkeyPatch) -> None:
     """--root 传给服务，任意查询值只能查找既有项目引用。"""
 

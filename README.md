@@ -61,6 +61,8 @@ uv run specify --root example_specs web
 ```
 
 - **正式 Spec**：按 type 浏览当前规范，点击 Spec 查看简介和 Contract 正文。
+- **查找栏**：标题栏右侧的查找栏像 `rg` 一样搜索 Contract 的 ID、标题和正文；命中后左栏只保留命中 Contract 所属的 Spec，右侧只显示命中的 Contract 并高亮关键词。支持区分大小写（`Aa`）、全字匹配（`wd`）、正则（`.*`）和按 type 限定范围；`‹ ›` 或 Enter / Shift+Enter 在命中处之间移动，按 `/` 聚焦，Esc 清空并退出搜索。
+- **图表**：Contract 正文中语言标记为 `pele` 或 `mermaid` 的代码围栏会渲染为 [Pele](https://pele.run) 图表，源码保留在「查看图表源码」中。Pele 以 MIT 许可证内置，不依赖外部 CDN。
 - **Changes**：左侧 Change 通过曲线连到右侧各个 Spec；每个 Spec 用树形折线展开到 Contract。点击 Contract 查看逐行 diff，或用「展开全部」查看当前 Change 的所有差异。点击 Spec 名称可在修改列表旁边打开正式正文，此时 Change 根节点和连线让出空间，收起正文即可恢复影响树。
 - **待拆解需求**：`proposed` 详情在可滚动的正文框中渲染 `change.md`。进入 `processing` 后可以查看任务进度、影响范围和 diff。
 - **优先级**：左栏在各状态分组内按 P0 到 P4 排序，同级保留原顺序。选择「P2 及以上」可查看 P0、P1 和 P2。色块随档位依次使用红、蓝、紫、绿、黄。

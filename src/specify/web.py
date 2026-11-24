@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
+import re
 import webbrowser
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
+from dataclasses import dataclass
 from datetime import datetime
 from difflib import unified_diff
 from hashlib import sha256
 from html import escape
+from html.parser import HTMLParser
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
@@ -17,6 +20,8 @@ from threading import Thread
 from urllib.parse import parse_qs, urlencode
 
 from markdown_it import MarkdownIt
+from markdown_it.token import Token
+from markdown_it.utils import EnvType, OptionsDict
 
 from .archive import ArchiveService
 from .config import load_config
@@ -48,6 +53,58 @@ CONTRACT_ACTIONS = {
     "RENAMED": "重命名",
 }
 READ_ERRORS = (OSError, UnicodeError, SpecifyError)
+DIAGRAM_LANGUAGES = {"pele", "mermaid"}
+SEARCH_ICON = (
+    '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false">'
+    '<circle cx="6.5" cy="6.5" r="4.5" fill="none" stroke="currentColor" stroke-width="1.6"/>'
+    '<path d="m10.2 10.2 4 4" fill="none" stroke="currentColor" stroke-width="1.6" '
+    'stroke-linecap="round"/></svg>'
+)
+CLEAR_ICON = (
+    '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">'
+    '<path d="m4.5 4.5 7 7m0-7-7 7" fill="none" stroke="currentColor" stroke-width="1.6" '
+    'stroke-linecap="round"/></svg>'
+)
+CHEVRON_ICONS = {
+    "prev": (
+        '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">'
+        '<path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" '
+        'stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    ),
+    "next": (
+        '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" focusable="false">'
+        '<path d="m6 3 5 5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" '
+        'stroke-linecap="round" stroke-linejoin="round"/></svg>'
+    ),
+}
+
+
+@dataclass(frozen=True)
+class SearchState:
+    """一次查找的条件和退出地址，供查找栏与左栏命中列表共用。"""
+
+    query: str
+    use_regex: bool
+    match_case: bool
+    whole_word: bool
+    spec_type: str
+    clear_url: str
+    # 当前打开的 Spec；切换查找条件时保留，避免跳回第一条命中。
+    reference: str = ""
+
+    @property
+    def active(self) -> bool:
+        """空查询表示普通浏览，不显示命中步进。"""
+
+        return bool(self.query)
+
+
+@dataclass(frozen=True)
+class SpecMatch:
+    """一个正式 Spec 的搜索结果：只保留命中的 Contract。"""
+
+    reference: str
+    contracts: list[Contract]
 
 
 class ReviewPage:
@@ -66,16 +123,68 @@ class ReviewPage:
         self.history = ContractHistory(paths)
         # 不执行项目文档中的 HTML，也不自动加载外部图片。
         self.markdown = MarkdownIt("commonmark", {"html": False}).disable("image")
+        # 保留默认围栏规则，把 pele/mermaid 代码块替换成可挂载的图表容器。
+        self.default_fence = self.markdown.renderer.rules["fence"]
+        self.markdown.renderer.rules["fence"] = self.render_fence
+
+    def render_fence(
+        self,
+        tokens: Sequence[Token],
+        index: int,
+        options: OptionsDict,
+        env: EnvType,
+    ) -> str:
+        """把图表围栏转成可挂载容器，其他语言沿用默认代码块。"""
+
+        token = tokens[index]
+        info = token.info.strip()
+        language = info.split(maxsplit=1)[0].lower() if info else ""
+        if language not in DIAGRAM_LANGUAGES:
+            return self.default_fence(tokens, index, options, env)
+        # 源码保留在 details 中：脚本不可用或渲染失败时仍可阅读和复制。
+        return (
+            '<figure class="diagram" data-pele>'
+            '<div class="diagram-canvas" data-pele-canvas role="img" '
+            'aria-label="Pele 图表，图表源码见下方">'
+            '<p class="diagram-pending">正在渲染图表…</p></div>'
+            '<details class="diagram-source"><summary>查看图表源码</summary>'
+            f"<pre><code>{escape(token.content)}</code></pre></details>"
+            "</figure>"
+        )
 
     def render(
         self, query: dict[str, list[str]], revision: str = ""
     ) -> tuple[HTTPStatus, str]:
         """按当前 tab 生成导航和详情；未知引用不进入磁盘读取流程。"""
 
+        # 查找词、大小写/全字/正则开关和类型限定共同决定左栏范围与正文高亮。
+        search = query.get("q", [""])[0].strip()
+        use_regex = query.get("re", [""])[0] == "1"
+        match_case = query.get("case", [""])[0] == "1"
+        whole_word = query.get("word", [""])[0] == "1"
+        spec_type = query.get("type", [""])[0]
+        if spec_type not in self.config["specTypes"]:
+            spec_type = ""
+        pattern, search_error = search_pattern(
+            search, use_regex, match_case, whole_word
+        )
+        searching = bool(search)
+        matches: list[SpecMatch] = []
+        read_errors: list[str] = []
         tab = "change" if "change" in query else "spec"
         cutoff = ""
-        filter_control = ""
-        if tab == "change":
+        if searching:
+            tab = "spec"
+            if pattern is not None:
+                matches, read_errors = self.search_specs(pattern, spec_type)
+            entries = {
+                match.reference: self.specs[match.reference] for match in matches
+            }
+            groups = (
+                (ref.split(":", 1)[0], ref, ref.split(":", 1)[1], None)
+                for ref in entries
+            )
+        elif tab == "change":
             cutoff = query.get("priority", [""])[0]
             if cutoff not in CHANGE_PRIORITIES:
                 cutoff = ""
@@ -91,38 +200,93 @@ class ReviewPage:
                 for ref in entries
             )
 
-        # 当前 change 被筛掉时选中首条匹配项，未知 ID 仍按原规则报错。
         selected = query.get(tab, [""])[0]
-        if tab == "change" and selected in self.changes and selected not in entries:
-            selected = ""
-        selected = selected or next(iter(entries), "")
-        if tab == "change":
-            filter_control = priority_filter(cutoff, selected)
+        filter_control = ""
+        clear_url = ""
         status = HTTPStatus.OK
-        try:
-            if selected and selected not in entries:
+        if searching:
+            # 右侧只保留命中的 Contract，并自动打开左栏第一条命中项。
+            if selected and selected not in self.specs:
                 status = HTTPStatus.NOT_FOUND
-                detail = f'<p class="notice">找不到 {tab}：{escape(selected)}</p>'
-            elif not selected:
-                if cutoff:
-                    detail = notice("没有符合此优先级筛选的 Change。")
-                else:
-                    detail = f'<p class="notice">当前项目还没有 {"Change" if tab == "change" else "正式 Spec"}。</p>'
-            elif tab == "change":
-                detail = self.change_detail(self.changes[selected])
+                detail = f'<p class="notice">找不到 spec：{escape(selected)}</p>'
+                clear_url = "/"
             else:
-                detail = self.spec_detail(selected, self.specs[selected])
-        except READ_ERRORS as error:
-            detail = notice(error)
+                # 切换条件时保留当前 Spec；它不再命中则跳到第一条命中项。
+                if selected and selected not in entries:
+                    selected = ""
+                selected = selected or next(iter(entries), "")
+                clear_url = f"/?{urlencode({'spec': selected})}" if selected else "/"
+                if search_error:
+                    detail = notice(search_error)
+                elif not selected:
+                    detail = self.search_empty(search, spec_type, clear_url)
+                else:
+                    match = next(
+                        (item for item in matches if item.reference == selected), None
+                    )
+                    only = (
+                        {item.id for item in match.contracts}
+                        if match is not None
+                        else set()
+                    )
+                    try:
+                        detail = self.spec_detail(
+                            selected, self.specs[selected], pattern, only
+                        )
+                    except READ_ERRORS as error:
+                        detail = notice(error)
+                detail = "".join(notice(error) for error in read_errors) + detail
+        else:
+            # 当前 change 被筛掉时选中首条匹配项，未知 ID 仍按原规则报错。
+            if tab == "change" and selected in self.changes and selected not in entries:
+                selected = ""
+            selected = selected or next(iter(entries), "")
+            if tab == "change":
+                filter_control = priority_filter(cutoff, selected)
+            try:
+                if selected and selected not in entries:
+                    status = HTTPStatus.NOT_FOUND
+                    detail = f'<p class="notice">找不到 {tab}：{escape(selected)}</p>'
+                elif not selected:
+                    if cutoff:
+                        detail = notice("没有符合此优先级筛选的 Change。")
+                    else:
+                        detail = f'<p class="notice">当前项目还没有 {"Change" if tab == "change" else "正式 Spec"}。</p>'
+                elif tab == "change":
+                    detail = self.change_detail(self.changes[selected])
+                else:
+                    detail = self.spec_detail(selected, self.specs[selected])
+            except READ_ERRORS as error:
+                detail = notice(error)
 
-        sidebar = filter_control + "".join(
-            f"<h2>{escape(group)}</h2><ul>"
-            + "".join(
-                f"<li>{link(tab, key, label, key == selected, priority, cutoff)}</li>"
-                for _, key, label, priority in items
+        state = SearchState(
+            search,
+            use_regex,
+            match_case,
+            whole_word,
+            spec_type,
+            clear_url,
+            selected if selected in self.specs else "",
+        )
+        if searching:
+            sidebar = self.search_sidebar(state, matches, selected)
+        else:
+            sidebar = filter_control + "".join(
+                f"<h2>{escape(group)}</h2><ul>"
+                + "".join(
+                    f"<li>{link(tab, key, label, key == selected, priority, cutoff)}</li>"
+                    for _, key, label, priority in items
+                )
+                + "</ul>"
+                for group, items in groupby(groups, key=lambda item: item[0])
             )
-            + "</ul>"
-            for group, items in groupby(groups, key=lambda item: item[0])
+        # 正文里的 mark 数量即查找栏的命中总数，步进和计数由脚本接管。
+        findbar = self.search_form(state, detail.count("<mark>"))
+        # 只有页面出现图表时才加载 Pele，避免普通阅读也下载渲染器。
+        diagram_script = (
+            '<script src="/pele.js" defer></script>'
+            if '<figure class="diagram" data-pele>' in detail
+            else ""
         )
         return (
             status,
@@ -131,15 +295,164 @@ class ReviewPage:
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="specify-revision" content="{escape(revision)}">
 <title>Specify · Review</title><link rel="stylesheet" href="/review.css">
-<script src="/review.js" defer></script></head>
+{diagram_script}<script src="/review.js" defer></script></head>
 <body><a class="skip" href="#review">跳到详情</a>
 <header><div class="frame"><h1>Specify <small>Review</small></h1>
 <p>{escape(self.paths.root.name)} <span class="pill">本地只读</span></p>
-<nav aria-label="视图">{link("spec", "", f"正式 Spec ({len(self.specs)})", tab == "spec")}
-{link("change", "", f"Changes ({len(self.changes)})", tab == "change", cutoff=cutoff)}</nav></div></header>
+<div class="header-bar"><nav aria-label="视图">{link("spec", "", f"正式 Spec ({len(self.specs)})", tab == "spec")}
+{link("change", "", f"Changes ({len(self.changes)})", tab == "change", cutoff=cutoff)}</nav>
+{findbar}</div></div></header>
 <div class="frame layout"><nav class="sidebar" aria-label="项目列表">{sidebar}</nav>
 <main id="review">{detail}</main></div></body></html>""",
         )
+
+    def search_form(self, state: SearchState, hit_total: int) -> str:
+        """渲染标题栏右侧的查找栏：输入、条件开关和命中步进。"""
+
+        # 类型选项来自项目配置，非法值已在渲染前被忽略。
+        options = ['<option value="">全部类型</option>']
+        for kind in self.config["specTypes"]:
+            current = " selected" if kind == state.spec_type else ""
+            options.append(
+                f'<option value="{escape(kind)}"{current}>{escape(kind)}</option>'
+            )
+
+        def toggle(name: str, label: str, hint: str, checked: bool) -> str:
+            """渲染一个用缩写显示的条件开关，具体含义放在 title 中。"""
+
+            mark = " checked" if checked else ""
+            return (
+                f'<label class="find-toggle" title="{hint}">'
+                f'<input type="checkbox" name="{name}" value="1"{mark} '
+                f'aria-label="{hint}"><span>{label}</span></label>'
+            )
+
+        clear = (
+            f' data-clear-url="{escape(state.clear_url)}"' if state.clear_url else ""
+        )
+        # 有查找词时左侧变成退出按钮，没有时保留可点击的搜索入口。
+        if state.active:
+            lead = (
+                f'<a class="findbar-lead" href="{escape(state.clear_url)}" '
+                f'aria-label="清除搜索" title="清除搜索（Esc）">{CLEAR_ICON}</a>'
+            )
+        else:
+            lead = (
+                '<button class="findbar-lead" type="submit" aria-label="搜索" '
+                f'title="搜索">{SEARCH_ICON}</button>'
+            )
+        nav = ""
+        if state.active and hit_total:
+            nav = (
+                '<div class="findbar-nav">'
+                '<button type="button" class="findbar-step" data-find-prev '
+                f'aria-label="上一个命中" title="上一个命中（Shift+Enter）">'
+                f"{CHEVRON_ICONS['prev']}</button>"
+                '<button type="button" class="findbar-step" data-find-next '
+                f'aria-label="下一个命中" title="下一个命中（Enter）">'
+                f"{CHEVRON_ICONS['next']}</button>"
+                f'<span class="findbar-count" data-find-count aria-live="polite">'
+                f"1/{hit_total}</span></div>"
+            )
+        # 条件开关提交时带上当前 Spec，仍命中就留在原页面。
+        keep = (
+            f'<input type="hidden" name="spec" value="{escape(state.reference)}">'
+            if state.reference and state.active
+            else ""
+        )
+        # 搜索页保留焦点，回车可以连续跳到下一处命中。
+        autofocus = " autofocus" if state.active else ""
+        return (
+            f'<form class="findbar" role="search" action="/"{clear} data-spec-search '
+            f'data-query="{escape(state.query)}">'
+            f"{keep}{lead}"
+            '<div class="findbar-field">'
+            '<label class="visually-hidden" for="spec-search">搜索 Spec 内容</label>'
+            f'<input id="spec-search" name="q" type="search" value="{escape(state.query)}" '
+            'placeholder="搜索 Spec 内容…" autocomplete="off" spellcheck="false"'
+            f"{autofocus} "
+            'title="按 Enter 搜索或跳到下一个命中，Shift+Enter 返回上一个" '
+            'aria-keyshortcuts="/">'
+            '<div class="findbar-toggles">'
+            + toggle("case", "Aa", "区分大小写", state.match_case)
+            + toggle("word", "wd", "全字匹配（whole word）", state.whole_word)
+            + toggle("re", ".*", "正则表达式", state.use_regex)
+            + "</div></div>"
+            '<label class="findbar-type" title="限定 Spec 类型">'
+            '<span class="visually-hidden">限定 Spec 类型</span>'
+            f'<select name="type">{"".join(options)}</select></label>'
+            f"{nav}</form>"
+        )
+
+    def search_sidebar(
+        self, state: SearchState, matches: list[SpecMatch], selected: str
+    ) -> str:
+        """左栏只列命中的 Spec，按类型分组并标出命中数量。"""
+
+        # 命中项链接保留查找条件，方便连续查看多个 Spec。
+        def item(match: SpecMatch) -> str:
+            """渲染一条命中 Spec 和它命中的 Contract 数量。"""
+
+            url = escape(search_href(match.reference, state))
+            current = ' aria-current="page"' if match.reference == selected else ""
+            name = match.reference.split(":", 1)[1]
+            return (
+                f'<li><a class="search-hit-link" href="{url}"{current}>'
+                f"<span>{escape(name)}</span>"
+                f'<span class="hit-count">{len(match.contracts)}</span></a></li>'
+            )
+
+        contracts = sum(len(match.contracts) for match in matches)
+        status = (
+            f'<p class="search-status"><span>{len(matches)} 个 Spec 命中 · '
+            f"{contracts} 条 Contract</span></p>"
+        )
+        groups = "".join(
+            f'<h2>{escape(kind)}</h2><ul class="search-hits">'
+            + "".join(item(match) for match in items)
+            + "</ul>"
+            for kind, items in groupby(
+                matches, key=lambda match: match.reference.split(":", 1)[0]
+            )
+        )
+        return status + groups
+
+    def search_empty(self, search: str, spec_type: str, clear_url: str) -> str:
+        """没有命中时说明搜索范围，并提供清除入口。"""
+
+        scope = f"在 {escape(spec_type)} 类型中" if spec_type else "在正式 Spec 中"
+        return (
+            '<section class="card search-empty"><p class="eyebrow">没有结果</p>'
+            f"<h3>{scope}没有找到 “{escape(search)}”</h3>"
+            "<p>搜索范围包括 Contract 的 ID、标题和正文；只保留命中 Contract 所属的 Spec。</p>"
+            f'<a class="search-clear" href="{escape(clear_url)}">清除搜索</a></section>'
+        )
+
+    def search_specs(
+        self, pattern: re.Pattern[str], spec_type: str = ""
+    ) -> tuple[list[SpecMatch], list[str]]:
+        """像 rg 一样只搜索 Contract 内容，保留命中 Contract 所属的 Spec。"""
+
+        matches: list[SpecMatch] = []
+        errors: list[str] = []
+        for reference, path in self.specs.items():
+            # 类型限定直接复用目录前缀，避免扫描范围外的文件。
+            if spec_type and not reference.startswith(f"{spec_type}:"):
+                continue
+            try:
+                document = parse_spec_file(path)
+            except READ_ERRORS as error:
+                # 单个坏文件不阻断其他 Spec 的搜索结果。
+                errors.append(str(error))
+                continue
+            contracts = [
+                contract
+                for contract in document.contracts
+                if matches_contract(pattern, contract)
+            ]
+            if contracts:
+                matches.append(SpecMatch(reference, contracts))
+        return matches, errors
 
     def change_entries(self, cutoff: str) -> dict[str, Change]:
         """按状态分组和优先级输出可见 change，同级沿用原扫描顺序。"""
@@ -160,20 +473,56 @@ class ReviewPage:
                     entries[change.id] = change
         return entries
 
-    def spec_detail(self, reference: str, path: Path) -> str:
-        """渲染当前 Spec 的简介和每条 Contract 的正文。"""
+    def spec_detail(
+        self,
+        reference: str,
+        path: Path,
+        pattern: re.Pattern[str] | None = None,
+        only: set[str] | None = None,
+    ) -> str:
+        """渲染当前 Spec；搜索时只显示命中的 Contract 并标记关键词。"""
 
         spec = parse_spec_file(path)
         description = SpecMetadata(path).description() or ""
-        cards = "".join(
-            f'<section class="card"><code>{escape(contract.id)}</code><h3>{escape(contract.title)}</h3>'
-            f"{self.markdown.render(contract.body)}</section>"
+        contracts = [
+            contract
             for contract in spec.contracts
+            if only is None or contract.id in only
+        ]
+        if only is not None:
+            # 搜索视图保留整份 Spec 的入口，方便暂时离开过滤结果。
+            full = escape(urlencode({"spec": reference}))
+            eyebrow = (
+                f'<div class="spec-meta"><p class="eyebrow">当前正式 Spec · '
+                f"命中 {len(contracts)} / {len(spec.contracts)} 条 Contract</p>"
+                f'<a class="spec-full-link" href="/?{full}">查看完整 Spec</a></div>'
+            )
+        else:
+            eyebrow = f'<p class="eyebrow">当前正式 Spec · {len(spec.contracts)} 条 Contract</p>'
+        cards = "".join(
+            f'<section class="card" id="contract-{escape(contract.id)}">'
+            f"<code>{highlighted(contract.id, pattern)}</code>"
+            f"<h3>{highlighted(contract.title, pattern)}</h3>"
+            f"{self.contract_body(contract, pattern)}</section>"
+            for contract in contracts
+        )
+        empty = (
+            '<p class="notice">该 Spec 没有命中的 Contract，可能只命中了引用或简介。</p>'
+            if only is not None and not contracts
+            else ""
         )
         return (
-            f'<p class="eyebrow">当前正式 Spec · {len(spec.contracts)} 条 Contract</p>'
-            f"<h2>{escape(reference)}</h2><p>{escape(description)}</p>{cards}"
+            f"{eyebrow}<h2>{highlighted(reference, pattern)}</h2>"
+            f"<p>{highlighted(description, pattern)}</p>{empty}{cards}"
         )
+
+    def contract_body(
+        self, contract: Contract, pattern: re.Pattern[str] | None = None
+    ) -> str:
+        """渲染 Contract 正文；搜索时只高亮文本节点，不改动 HTML 结构。"""
+
+        body = self.markdown.render(contract.body)
+        return highlight_html(body, pattern) if pattern is not None else body
 
     def change_detail(self, change: Change) -> str:
         """读取 change 说明、生命周期及声明的每个目标 Spec。"""
@@ -549,6 +898,141 @@ class ReviewPage:
         )
 
 
+def search_pattern(
+    query: str,
+    use_regex: bool = False,
+    match_case: bool = False,
+    whole_word: bool = False,
+) -> tuple[re.Pattern[str] | None, str]:
+    """把查找词编译成正则，并按开关处理大小写和全字匹配。"""
+
+    query = query.strip()
+    if not query:
+        return None, ""
+    source = query if use_regex else re.escape(query)
+    if whole_word:
+        # 用 Unicode 单词字符边界包住整个表达式，正则模式下针对整体生效。
+        source = rf"(?<!\w)(?:{source})(?!\w)"
+    try:
+        flags = 0 if match_case else re.IGNORECASE
+        pattern = re.compile(source, flags)
+    except re.error as error:
+        return None, f"正则表达式无效：{error}"
+    # 能匹配空串的正则会让每个位置都命中，拒绝这种没有意义的输入。
+    if pattern.search("") is not None:
+        return None, "正则表达式不能匹配空字符串"
+    return pattern, ""
+
+
+def find_match(pattern: re.Pattern[str], text: str) -> re.Match[str] | None:
+    """返回第一个非空命中，忽略零宽断言产生的空标记。"""
+
+    for match in pattern.finditer(text):
+        if match.end() > match.start():
+            return match
+    return None
+
+
+def matches_contract(pattern: re.Pattern[str], contract: Contract) -> bool:
+    """Contract 的 ID、标题或正文任一命中即可纳入搜索结果。"""
+
+    return (
+        find_match(pattern, contract.id) is not None
+        or find_match(pattern, contract.title) is not None
+        or find_match(pattern, contract.body) is not None
+    )
+
+
+def highlighted(text: str, pattern: re.Pattern[str] | None = None) -> str:
+    """转义文本并用 mark 标出命中，避免搜索词被当作 HTML。"""
+
+    if pattern is None:
+        return escape(text)
+    parts: list[str] = []
+    last = 0
+    for match in pattern.finditer(text):
+        # 纯断言可能没有可高亮的字符。
+        if match.end() == match.start():
+            continue
+        parts.append(escape(text[last : match.start()]))
+        parts.append(f"<mark>{escape(match.group())}</mark>")
+        last = match.end()
+    parts.append(escape(text[last:]))
+    return "".join(parts)
+
+
+class HtmlHighlighter(HTMLParser):
+    """在渲染后的 HTML 文本节点中插入 mark，标签和属性保持原样。"""
+
+    def __init__(self, pattern: re.Pattern[str]):
+        """保存搜索正则并准备输出片段。"""
+
+        super().__init__(convert_charrefs=True)
+        self.pattern = pattern
+        self.parts: list[str] = []
+        # 图表源码默认折叠，不属于可见正文，也不参与命中计数。
+        self.source_depth = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        """原样保留开始标签；进入图表源码时暂停高亮。"""
+
+        classes = dict(attrs).get("class") or ""
+        if tag == "details" and "diagram-source" in classes.split():
+            self.source_depth += 1
+        self.parts.append(self.get_starttag_text() or f"<{tag}>")
+
+    def handle_startendtag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        """原样保留自闭合标签。"""
+
+        self.parts.append(self.get_starttag_text() or f"<{tag}/>")
+
+    def handle_endtag(self, tag: str) -> None:
+        """结束标签不需要改写，离开图表源码后恢复高亮。"""
+
+        if tag == "details" and self.source_depth:
+            self.source_depth -= 1
+        self.parts.append(f"</{tag}>")
+
+    def handle_comment(self, data: str) -> None:
+        """保留注释内容，避免重新序列化时丢失。"""
+
+        self.parts.append(f"<!--{data}-->")
+
+    def handle_data(self, data: str) -> None:
+        """文本节点先解码再高亮，图表源码只转义不标记。"""
+
+        if self.source_depth:
+            self.parts.append(escape(data))
+        else:
+            self.parts.append(highlighted(data, self.pattern))
+
+
+def highlight_html(source: str, pattern: re.Pattern[str]) -> str:
+    """遍历渲染后的 HTML，只在可见文本里标记命中。"""
+
+    parser = HtmlHighlighter(pattern)
+    parser.feed(source)
+    parser.close()
+    return "".join(parser.parts)
+
+
+def search_href(reference: str, state: SearchState) -> str:
+    """生成保留查找条件的 Spec 链接，方便连续查看命中项。"""
+
+    params = {"spec": reference}
+    if state.query:
+        params["q"] = state.query
+    if state.use_regex:
+        params["re"] = "1"
+    if state.match_case:
+        params["case"] = "1"
+    if state.whole_word:
+        params["word"] = "1"
+    if state.spec_type:
+        params["type"] = state.spec_type
+    return "/?" + urlencode(params)
+
+
 def priority_filter(cutoff: str, change_id: str) -> str:
     """用可分享的站内链接渲染筛选菜单，并标出当前选项。"""
 
@@ -685,6 +1169,8 @@ def serve_review(paths: RepoPaths, announce: Callable[[str], None]) -> None:
         for route, media_type in {
             "/review.css": "text/css",
             "/review.js": "text/javascript",
+            # Pele 以 MIT 许可证内置，避免本地 Review 依赖外部 CDN。
+            "/pele.js": "text/javascript",
         }.items()
     }
 
@@ -732,9 +1218,10 @@ def serve_review(paths: RepoPaths, announce: Callable[[str], None]) -> None:
             self.send_header("Cache-Control", "no-store")
             self.send_header("Referrer-Policy", "no-referrer")
             self.send_header("X-Content-Type-Options", "nosniff")
+            # Pele 的 SVG 使用内联 style 属性描述布局；脚本仍只允许本站资源。
             self.send_header(
                 "Content-Security-Policy",
-                "default-src 'none'; style-src 'self'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+                "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
             )
             self.end_headers()
             self.wfile.write(encoded)

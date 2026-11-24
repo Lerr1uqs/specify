@@ -62,6 +62,148 @@ if (impactTree) {
   }
 }
 
+class DiagramRenderer {
+  /**
+   * 把服务端生成的 Pele 容器挂载成 SVG，源码保留在 details 中可复制。
+   * @param {HTMLElement} figure
+   */
+  constructor(figure) {
+    this.figure = figure;
+    this.canvas = figure.querySelector("[data-pele-canvas]");
+    this.source = figure.querySelector(".diagram-source code");
+  }
+
+  /** 渲染失败时保留可读源码，不让空画布挡住正文。 */
+  render() {
+    if (!this.canvas || !this.source) return;
+    if (!window.pele || typeof window.pele.mount !== "function") {
+      this.canvas.textContent = "图表渲染器未加载，请展开下方源码。";
+      return;
+    }
+    try {
+      window.pele.mount(this.canvas, this.source.textContent);
+      this.figure.classList.add("is-rendered");
+    } catch {
+      this.canvas.textContent = "图表渲染失败，请展开下方源码检查语法。";
+    }
+  }
+}
+
+for (const figure of document.querySelectorAll("[data-pele]")) {
+  new DiagramRenderer(figure).render();
+}
+
+class FindBar {
+  /**
+   * 管理查找栏：快捷键、条件切换、正文命中步进和计数同步。
+   * @param {HTMLFormElement} form
+   */
+  constructor(form) {
+    this.form = form;
+    this.input = form.querySelector('input[type="search"]');
+    this.initial = form.dataset.query || "";
+    this.counter = form.querySelector("[data-find-count]");
+    // 图表源码默认折叠，不参与步进，和计数口径保持一致。
+    this.marks = [...document.querySelectorAll("main mark")]
+      .filter((mark) => !mark.closest(".diagram-source"));
+    this.index = 0;
+    document.addEventListener("keydown", (event) => this.onKeydown(event));
+    form.addEventListener("keydown", (event) => this.onFieldKeydown(event));
+    // 隐式提交由 Enter 的默认行为触发，keypress 也一并拦下更稳妥。
+    form.addEventListener("keypress", (event) => this.onFieldKeypress(event));
+    form.querySelector("[data-find-prev]")
+      ?.addEventListener("click", () => this.step(-1));
+    form.querySelector("[data-find-next]")
+      ?.addEventListener("click", () => this.step(1));
+    // 条件变化立即重新搜索，和常见查找栏一致。
+    for (const control of form.querySelectorAll(
+      '.find-toggle input, select[name="type"]',
+    )) {
+      control.addEventListener("change", () => this.research());
+    }
+    if (this.counter && this.marks.length) this.update();
+    this.revealFirstMatch();
+  }
+
+  /** 只在没有修饰键、焦点不在编辑控件或弹窗内时响应 /。 */
+  isShortcut(event) {
+    if (event.key !== "/" || event.metaKey || event.ctrlKey || event.altKey) return false;
+    if (document.querySelector("dialog[open]")) return false;
+    const target = event.target;
+    return !(target instanceof HTMLElement && (
+      target.isContentEditable
+      || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)
+    ));
+  }
+
+  /** / 聚焦查找框；Escape 先清空输入，再退出搜索结果。 */
+  onKeydown(event) {
+    if (this.isShortcut(event)) {
+      event.preventDefault();
+      this.input.focus();
+      this.input.select();
+      return;
+    }
+    if (event.key !== "Escape" || document.activeElement !== this.input) return;
+    event.preventDefault();
+    if (this.input.value) {
+      this.input.value = "";
+    } else if (this.form.dataset.clearUrl) {
+      location.href = this.form.dataset.clearUrl;
+    }
+  }
+
+  /** 查询未变时 Enter 跳下一个命中、Shift+Enter 返回上一个。 */
+  onFieldKeydown(event) {
+    if (event.key !== "Enter") return;
+    if (!this.marks.length || this.input.value.trim() !== this.initial) return;
+    event.preventDefault();
+    this.step(event.shiftKey ? -1 : 1);
+  }
+
+  /** 已经切换命中时，阻止 keypress 触发表单提交。 */
+  onFieldKeypress(event) {
+    if (event.key !== "Enter") return;
+    if (!this.marks.length || this.input.value.trim() !== this.initial) return;
+    event.preventDefault();
+  }
+
+  /** 输入或条件变化后提交新查询；空查询时保持当前页面。 */
+  research() {
+    if (!this.input.value.trim() && !this.initial) return;
+    this.form.requestSubmit();
+  }
+
+  /** 循环移动到上/下一处高亮，并让页面跟随当前命中。 */
+  step(delta) {
+    if (!this.marks.length) return;
+    this.index = (this.index + delta + this.marks.length) % this.marks.length;
+    this.update();
+    this.marks[this.index].scrollIntoView({block: "center"});
+  }
+
+  /** 标记当前命中并同步计数文本。 */
+  update() {
+    for (const mark of this.marks) mark.classList.remove("is-current-hit");
+    this.marks[this.index].classList.add("is-current-hit");
+    if (this.counter) {
+      this.counter.textContent = `${this.index + 1}/${this.marks.length}`;
+    }
+  }
+
+  /** 搜索视图才自动定位；带锚点和已在视野内时不打扰阅读位置。 */
+  revealFirstMatch() {
+    if (!this.initial || location.hash || !this.marks.length) return;
+    const rect = this.marks[0].getBoundingClientRect();
+    if (rect.top < 0 || rect.top > innerHeight * 0.7) {
+      this.marks[0].scrollIntoView({block: "center"});
+    }
+  }
+}
+
+const searchForm = document.querySelector("[data-spec-search]");
+if (searchForm) new FindBar(searchForm);
+
 const priorityFilter = document.querySelector("[data-priority-filter]");
 if (priorityFilter) {
   const trigger = priorityFilter.querySelector("summary");
