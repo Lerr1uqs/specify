@@ -6,6 +6,4 @@
 
 ## 待做
 
-- [ ] **Change 交接**：让 `specify change status` 输出当前阶段、缺失项、相关文件和建议的下一步，方便人或 agent 接手。
-- [ ] **Contract Audit**：用同一次审查检查当前代码是否满足 Contract，以及相关 Contract 之间是否存在矛盾。统一报告涉及的 Contract、代码或测试证据，以及发现的缺口和冲突。
 - [ ] **并行 Change 预检**：在 sync 前列出哪些活跃 Change 改动了同一个 Contract、各自基于哪个版本，以及先同步谁会让哪些基线过期。

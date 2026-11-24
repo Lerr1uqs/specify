@@ -147,17 +147,18 @@ class ArchiveValidator:
         self.root = paths.changes / "archived"
         self.manifest_path = self.root / "manifest.json"
 
-    def validate(self) -> list[Issue]:
-        """报告 manifest 缺项、磁盘游离文件和内容篡改。"""
+    def validate(self, change: Change | None = None) -> list[Issue]:
+        """检查归档清单，可只对照指定 change 的磁盘文件。"""
 
+        directory = change.path if change else self.root
         if not self.manifest_path.is_file():
             unregistered = (
                 sorted(
                     path.relative_to(self.root).as_posix()
-                    for path in self.root.rglob("*")
+                    for path in directory.rglob("*")
                     if path.is_file()
                 )
-                if self.root.is_dir()
+                if directory.is_dir()
                 else []
             )
             return [Issue("归档文件未登记到 manifest", name) for name in unregistered]
@@ -181,9 +182,16 @@ class ArchiveValidator:
         registered = {item["path"]: item for item in entries}
         if len(registered) != len(entries):
             return [Issue("archive manifest 中有重复路径", str(self.manifest_path))]
+        if change:
+            prefix = directory.relative_to(self.root).as_posix() + "/"
+            registered = {
+                name: entry
+                for name, entry in registered.items()
+                if name.startswith(prefix)
+            }
         on_disk = {
             path.relative_to(self.root).as_posix(): path
-            for path in self.root.rglob("*")
+            for path in directory.rglob("*")
             if path.is_file() and path != self.manifest_path
         }
         issues: list[Issue] = []

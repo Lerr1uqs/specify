@@ -590,6 +590,85 @@ def test_cli_actions_and_no_impact_lifecycle(tmp_path: Path) -> None:
     assert invoke(runner, tmp_path, "validate", "--archived").exit_code == 1
 
 
+def test_change_status_reports_next_step_and_missing_baseline(tmp_path: Path) -> None:
+    """交接输出随状态推进，缺基线与归档完整性都能从 JSON 判断。"""
+
+    runner = CliRunner()
+    initialize(runner, tmp_path)
+    write_spec(tmp_path, "capability", "login", "login", "登录", "原文。")
+    change_id = "review-login"
+
+    def run(*args: str, code: int = 0) -> Result:
+        """执行当前 change 的命令并核对退出码。"""
+
+        result = invoke(runner, tmp_path, *args, change_id)
+        assert result.exit_code == code, result.output
+        return result
+
+    def status(code: int = 0) -> dict:
+        """读取结构化交接报告。"""
+
+        return json.loads(run("--json", "change", "status", code=code).output)
+
+    assert (
+        invoke(runner, tmp_path, "change", "create", "feat", change_id).exit_code == 0
+    )
+    proposed = status()
+    assert proposed["status"] == "proposed" and proposed["tasks"] is None
+    assert proposed["missing"] == [] and proposed["nextStep"]["action"] == "process"
+    run("change", "process")
+    assert status(1)["missing"] == [{"kind": "spec-impact"}]
+    assert status(1)["nextStep"]["action"] == "declare-impact"
+    result = invoke(
+        runner,
+        tmp_path,
+        "change",
+        "process",
+        change_id,
+        "--affect",
+        "capability:login:modify",
+    )
+    assert result.exit_code == 0, result.output
+
+    directory = tmp_path / "spec/changes/processing/feat" / change_id
+    delta = directory / "deltas/capability/login.md"
+    delta.write_text("# delta\n\n## [MODIFIED] [login] 登录\n\n新正文。\n")
+    missing = status(1)
+    assert missing["missing"] == [
+        {"kind": "baseline", "reference": "capability:login:login"}
+    ]
+    assert missing["nextStep"]["command"] == [
+        "specify",
+        "change",
+        "baseline",
+        change_id,
+    ]
+    assert {file["role"] for file in missing["files"]} == {
+        "metadata",
+        "context",
+        "tasks",
+        "delta",
+        "spec",
+    }
+
+    run("change", "baseline")
+    assert status()["nextStep"]["action"] == "complete-tasks"
+    assert status()["tasks"]["pending"][0]["id"] == "1.1"
+    complete_tasks(directory)
+    assert status()["nextStep"]["action"] == "implement"
+    run("change", "implement")
+    assert status()["missing"] == [{"kind": "sync-receipt"}]
+    assert status()["nextStep"]["action"] == "sync"
+    run("change", "sync")
+    assert status()["nextStep"]["action"] == "archive"
+    run("change", "archive")
+    archived = status()
+    assert archived["status"] == "archived" and archived["nextStep"] is None
+    (tmp_path / archived["path"] / "change.md").write_text("归档后被修改。\n")
+    broken = status(1)
+    assert not broken["ok"] and "hash 不匹配" in broken["issues"][0]["message"]
+
+
 def test_process_migrates_existing_proposal_without_recapturing_baseline(
     tmp_path: Path,
 ) -> None:
@@ -632,6 +711,10 @@ def test_process_migrates_existing_proposal_without_recapturing_baseline(
     assert load_yaml(target / "meta-data.yaml")["baseVersions"] == baseline
     result = invoke(runner, tmp_path, "change", "verify", "legacy-login")
     assert result.exit_code == 1 and "基线已变化" in result.output
+    report = invoke(runner, tmp_path, "--json", "change", "status", "legacy-login")
+    assert report.exit_code == 1
+    next_step = json.loads(report.output)["nextStep"]
+    assert next_step["action"] == "review-stale-baseline" and "command" not in next_step
 
 
 def test_sync_conflict_rejects_every_target_before_writing(tmp_path: Path) -> None:

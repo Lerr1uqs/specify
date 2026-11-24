@@ -11,15 +11,194 @@ from rich.console import Console
 from rich.text import Text
 from rich.tree import Tree
 
+from .archive import ArchiveValidator
 from .config import load_config
 from .errors import SpecifyError
 from .index import list_specs
-from .models import Issue
+from .models import Change, Issue
 from .parse.tasks import parse_tasks_file
-from .paths import RepoPaths, scan_changes
+from .paths import RepoPaths, scan_changes, validate_id
 from .spec_metadata import SpecMetadata
-from .validate.changes import validate_change
+from .validate.changes import read_metadata, validate_change
 from .validate.specs import validate_specs
+
+
+class ChangeHandoff:
+    """汇总单个 change 的证据、阻塞项与下一步，只读取项目文件。"""
+
+    def __init__(self, paths: RepoPaths):
+        """绑定路径，文件引用统一相对于项目根。"""
+
+        self.paths = paths
+
+    def read(self, change: Change) -> tuple[dict[str, Any], list[Issue]]:
+        """复用生命周期校验，再补充供交接使用的文件和任务信息。"""
+
+        config = load_config(self.paths)
+        if change.status == "archived":
+            issues = ArchiveValidator(self.paths).validate(change)
+            try:
+                change.metadata = read_metadata(change)
+            except SpecifyError as error:
+                issues.append(Issue(error.message, error.path))
+        else:
+            issues = validate_change(self.paths, config, change)
+
+        metadata = change.metadata
+        directory = change.path.relative_to(self.paths.root)
+        files: list[dict[str, Any]] = []
+        missing: list[dict[str, str]] = []
+        roles = {
+            "metadata": change.path / "meta-data.yaml",
+            "context": change.path / "change.md",
+        }
+        if change.status == "archived":
+            roles["manifest"] = self.paths.changes / "archived" / "manifest.json"
+        tasks_path = change.path / "tasks.md"
+        if tasks_path.is_file() or change.status in {
+            "processing",
+            "implemented",
+            "archived",
+        }:
+            roles["tasks"] = tasks_path
+        for role, file_path in roles.items():
+            path = file_path.relative_to(self.paths.root).as_posix()
+            exists = file_path.is_file()
+            files.append({"role": role, "path": path, "exists": exists})
+            if not exists:
+                missing.append({"kind": "file", "path": path})
+
+        # 只用合法的 Spec 引用构造路径。坏的声明由原校验器报告。
+        affects = metadata.get("affects")
+        references = []
+        for target in affects if isinstance(affects, list) else []:
+            if not isinstance(target, dict):
+                continue
+            kind, name = target.get("type"), target.get("id")
+            if not isinstance(kind, str) or kind not in config["specTypes"]:
+                continue
+            if not isinstance(name, str) or not validate_id(name):
+                continue
+            references.append(f"{kind}:{name}")
+            delta = directory / "deltas" / kind / f"{name}.md"
+            exists = (self.paths.root / delta).is_file()
+            files.append({"role": "delta", "path": delta.as_posix(), "exists": exists})
+            if not exists and change.status in {
+                "processing",
+                "implemented",
+                "archived",
+            }:
+                missing.append({"kind": "file", "path": delta.as_posix()})
+            spec = self.paths.specs / kind / name / "spec.md"
+            files.append(
+                {
+                    "role": "spec",
+                    "path": spec.relative_to(self.paths.root).as_posix(),
+                    "exists": spec.is_file(),
+                }
+            )
+
+        if (
+            change.status == "processing"
+            and metadata
+            and not {"affects", "specImpact"} & metadata.keys()
+        ):
+            missing.append({"kind": "spec-impact"})
+        for issue in issues:
+            if issue.code == "baseline-keys":
+                missing.extend(
+                    {"kind": "baseline", "reference": reference}
+                    for reference in issue.references
+                )
+        if change.status == "implemented" and references and "sync" not in metadata:
+            missing.append({"kind": "sync-receipt"})
+
+        tasks = None
+        if tasks_path.is_file():
+            try:
+                items = parse_tasks_file(tasks_path)
+            except SpecifyError:
+                # 格式错误由生命周期校验报告，进度保持未知。
+                pass
+            else:
+                pending = [
+                    {"id": task.number, "text": task.text}
+                    for task in items
+                    if not task.done
+                ]
+                tasks = {
+                    "done": len(items) - len(pending),
+                    "total": len(items),
+                    "pending": pending,
+                }
+
+        remaining = len(tasks["pending"]) if tasks else 0
+        return {
+            "id": change.id,
+            "status": change.status,
+            "kind": change.kind,
+            "priority": change.priority,
+            "path": directory.as_posix(),
+            "files": files,
+            "affects": references,
+            "tasks": tasks,
+            "missing": missing,
+            "nextStep": self._next_step(change, issues, missing, remaining),
+        }, issues
+
+    @staticmethod
+    def _next_step(
+        change: Change,
+        issues: list[Issue],
+        missing: list[dict[str, str]],
+        remaining: int,
+    ) -> dict[str, Any] | None:
+        """按生命周期和真实校验结果选择下一步，过期基线先审查正文。"""
+
+        if change.status in {"archived", "rejected"}:
+            return None
+        if issues:
+            issue = issues[0]
+            if issue.code == "stale-baseline":
+                return {
+                    "action": "review-stale-baseline",
+                    "message": "对照当前 Contract 调整 delta，再重新捕获基线并验证。",
+                }
+            if issue.code == "baseline-keys" and issue.references:
+                return {
+                    "action": "capture-baseline",
+                    "message": "核对当前 Contract 和 delta 后捕获缺失的基线。",
+                    "command": ["specify", "change", "baseline", change.id],
+                }
+            if not any(item["kind"] == "file" for item in missing) and any(
+                item["kind"] == "spec-impact" for item in missing
+            ):
+                return {
+                    "action": "declare-impact",
+                    "message": "用 change process 声明 --affect，或用 --no-spec-impact 说明无影响。",
+                }
+            return {
+                "action": "resolve-issues",
+                "message": "先处理校验问题，再运行 change verify。",
+            }
+        if remaining and change.status in {"processing", "implemented"}:
+            return {
+                "action": "complete-tasks",
+                "message": f"完成剩余的 {remaining} 项任务，并核对实现与 Contract。",
+            }
+        if change.status == "proposed":
+            action, message = "process", "确认需求后进入 processing。"
+        elif change.status == "processing":
+            action, message = "implement", "确认实现后标记为 implemented。"
+        elif any(item["kind"] == "sync-receipt" for item in missing):
+            action, message = "sync", "将 delta 同步到正式 Spec。"
+        else:
+            action, message = "archive", "可以归档。"
+        return {
+            "action": action,
+            "message": message,
+            "command": ["specify", "change", action, change.id],
+        }
 
 
 class ProjectStatus:

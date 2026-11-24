@@ -22,6 +22,7 @@ Specify 用 Markdown 维护当前生效的规范，并通过 Change 推进修改
 | 讨论需求、查 Contract 或比较方案 | [specify-explore](../specify-explore/SKILL.md) |
 | 录入需求，或进入 processing 起草方案和任务 | [specify-propose](../specify-propose/SKILL.md) |
 | 继续实施已有 Change 并核对基线 | [specify-apply-change](../specify-apply-change/SKILL.md) |
+| 审查代码是否满足 Contract，以及 Contract 之间是否冲突 | [specify-audit](../specify-audit/SKILL.md) |
 | 同步和归档已实施的 Change | [specify-archive-change](../specify-archive-change/SKILL.md) |
 | 查询具体 CLI 命令或生命周期细节 | [specify-workflow](../specify-workflow/SKILL.md) |
 

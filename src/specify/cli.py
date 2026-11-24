@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import shutil
 import sys
-from collections.abc import Callable
 from datetime import datetime
 from itertools import groupby
 from operator import itemgetter
@@ -26,12 +25,12 @@ from .history_picker import HistoryReferenceCatalog, choose_history_reference
 from .history_view import HistoryView, HumanHistory
 from .index import SpecIndex, build_index
 from .io import move_to_trash
-from .models import CHANGE_PRIORITIES, DEFAULT_CHANGE_PRIORITY, Change, Issue
+from .models import CHANGE_PRIORITIES, DEFAULT_CHANGE_PRIORITY, Issue
 from .parse.spec import parse_spec_file
 from .paths import RepoPaths, find_change, validate_id
 from .scaffold import create_change, create_spec, initialize, process_change
 from .spec_metadata import SpecMetadata
-from .status import HumanStatus, ProjectStatus
+from .status import ChangeHandoff, HumanStatus, ProjectStatus
 from .sync import sync_change
 from .validate.changes import read_metadata, validate_change, validate_changes
 from .validate.specs import validate_specs
@@ -47,6 +46,7 @@ class CommandOutput:
         message: str = "",
         issues: list[Issue] | None = None,
         ok: bool = True,
+        details: dict[str, Any] | None = None,
     ) -> None:
         """按全局 --json 选项输出结果，验证问题写入 stderr。"""
 
@@ -55,6 +55,8 @@ class CommandOutput:
                 "ok": ok,
                 "issues": [issue.as_dict() for issue in (issues or [])],
             }
+            if details:
+                payload.update(details)
             if message:
                 payload["message"] = message
             click.echo(json.dumps(payload, ensure_ascii=False, sort_keys=True))
@@ -318,42 +320,46 @@ def change_baseline(context: click.Context, change_id: str) -> None:
         CommandOutput.fail(context, error)
 
 
-def inspect_change(
-    context: click.Context,
-    change_id: str,
-    action: Callable[[Change, list[Issue]], None],
-) -> None:
-    """为 status/verify 读取 change 并复用同一套只读校验。"""
-
-    try:
-        paths = project_paths(context)
-        change = find_change(paths, change_id)
-        issues = validate_change(paths, load_config(paths), change)
-        action(change, issues)
-    except SpecifyError as error:
-        CommandOutput.fail(context, error)
-
-
 @change_group.command("status")
 @click.argument("change_id")
 @click.pass_context
 def change_status(context: click.Context, change_id: str) -> None:
-    """显示目录状态和校验结果。"""
+    """输出 Change 交接信息、缺失项和建议的下一步。"""
 
-    def report(change: Change, issues: list[Issue]) -> None:
-        """输出 change 当前状态和可读性校验结果。"""
-
-        valid = not issues
-        CommandOutput.emit(
-            context,
-            f"{change.id}: {change.status}/{change.kind} ({'valid' if valid else 'invalid'})",
-            issues,
-            valid,
-        )
+    try:
+        paths = project_paths(context)
+        change = find_change(paths, change_id)
+        details, issues = ChangeHandoff(paths).read(change)
+        message = f"{change.id}: {change.status}/{change.kind} ({'invalid' if issues else 'valid'})"
+        if not context.obj["json"]:
+            lines = [message, f"目录 {details['path']}", "相关文件"]
+            for file in details["files"]:
+                state = "" if file["exists"] else "（当前不存在）"
+                lines.append(f"  {file['path']}{state}")
+            if tasks := details["tasks"]:
+                lines.append(f"任务 {tasks['done']}/{tasks['total']} 已完成")
+                lines.extend(
+                    f"  {task['id']} {task['text']}" for task in tasks["pending"]
+                )
+            for item in details["missing"]:
+                value = item.get("path") or item.get("reference")
+                kind = {
+                    "file": "文件",
+                    "baseline": "基线",
+                    "spec-impact": "Spec 影响声明",
+                    "sync-receipt": "同步回执",
+                }[item["kind"]]
+                lines.append(f"缺少{kind}" + (f" {value}" if value else ""))
+            if step := details["nextStep"]:
+                lines.append(f"下一步 {step['message']}")
+                if command := step.get("command"):
+                    lines.append("  " + " ".join(command))
+            message = "\n".join(lines)
+        CommandOutput.emit(context, message, issues, not issues, details)
         if issues:
             raise click.exceptions.Exit(ExitCode.VALIDATION)
-
-    inspect_change(context, change_id, report)
+    except SpecifyError as error:
+        CommandOutput.fail(context, error)
 
 
 @change_group.command("verify")
@@ -362,16 +368,17 @@ def change_status(context: click.Context, change_id: str) -> None:
 def change_verify(context: click.Context, change_id: str) -> None:
     """只读检查 metadata、tasks、delta 和基线。"""
 
-    def report(_change: Change, issues: list[Issue]) -> None:
-        """输出验证结果并使用约定的内容错误退出码。"""
-
+    try:
+        paths = project_paths(context)
+        change = find_change(paths, change_id)
+        issues = validate_change(paths, load_config(paths), change)
         valid = not issues
         message = "change 校验通过" if valid else "change 校验失败"
         CommandOutput.emit(context, message, issues, valid)
         if issues:
             raise click.exceptions.Exit(ExitCode.VALIDATION)
-
-    inspect_change(context, change_id, report)
+    except SpecifyError as error:
+        CommandOutput.fail(context, error)
 
 
 @change_group.command("implement")

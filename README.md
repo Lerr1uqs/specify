@@ -28,7 +28,7 @@ specify --help
 npx skills add Lerr1uqs/specify --skill '*'
 ```
 
-技能包包含 [`specify` 主技能](skills/specify/SKILL.md)、探索、提案、实施和归档四个专用 skill，以及 `specify-workflow` CLI 参考。初次接触 Specify 可从主技能了解概念、基本命令和各技能的入口。只想查阅 CLI 用法时，可以单独安装参考 skill：
+技能包包含 [`specify` 主技能](skills/specify/SKILL.md)、探索、提案、实施、审查和归档专用 skill，以及 `specify-workflow` CLI 参考。初次接触 Specify 可从主技能了解概念、基本命令和各技能的入口。只想查阅 CLI 用法时，可以单独安装参考 skill：
 
 ```bash
 npx skills add Lerr1uqs/specify --skill specify-workflow
@@ -181,11 +181,17 @@ specify list
 specify list --human
 specify list --spec --human
 specify status --human
+specify change status add-password-login
+specify --json change status add-password-login
 specify show capability:user-auth
 specify index build
 ```
 
 `list` 默认输出活跃 change 的 JSON，包括 kind、生命周期状态和 tasks 的已完成/总数。`list --human` 用 Rich 树按状态和 kind 分组展示。`list --change` 显式选择 change，`list --spec` 用缩进文本列出正式 spec，`--type` 仅与 `--spec` 搭配。`status` 默认输出整个项目的 JSON，`status --human` 同时显示 spec 和 change。`--human` 与全局 `--json` 互斥。`validate` 可用 `--specs`、`--changes` 或 `--archived` 限定检查范围。
+
+交接单个 Change 时，用 `change status <id>` 查看阶段、相关文件、未完成任务、缺失项和建议的下一步。`--json` 提供 `files`、`tasks`、`missing`、`nextStep` 和校验问题，存在校验问题时仍输出报告并返回退出码 1。
+
+用 [`specify-audit` 技能](skills/specify-audit/SKILL.md) 审查代码是否兑现正式 Contract，并在同一份报告里检查相关 Contract 是否冲突。技能会列出代码、测试和规范证据。`change verify` 负责 CLI 的结构与基线检查。
 
 查看本仓库示例项目：
 

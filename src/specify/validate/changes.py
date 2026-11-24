@@ -71,7 +71,7 @@ class ChangeValidator:
                 tasks = parse_tasks_file(tasks_path)
                 if require_complete_tasks and not all(task.done for task in tasks):
                     raise SpecifyError("执行该生命周期操作前必须完成所有 tasks")
-                self._validate_deltas(change, metadata, targets)
+                return self._validate_deltas(change, metadata, targets)
         except SpecifyError as exc:
             return [Issue(exc.message, str(exc.path or change.path))]
         return []
@@ -142,13 +142,16 @@ class ChangeValidator:
                 raise SpecifyError("affects 中的每一项必须是映射")
             spec_type = target.get("type")
             spec_id = target.get("id")
-            if spec_type not in self.config["specTypes"] or not validate_id(
-                str(spec_id or "")
+            if (
+                not isinstance(spec_type, str)
+                or spec_type not in self.config["specTypes"]
+                or not isinstance(spec_id, str)
+                or not validate_id(spec_id)
             ):
                 raise SpecifyError(
                     "affects target 必须使用已配置类型和 kebab-case spec id"
                 )
-            if target.get("change") not in {"create", "modify", "remove"}:
+            if target.get("change") not in ("create", "modify", "remove"):
                 raise SpecifyError(f"affects target 操作无效：{spec_type}:{spec_id}")
             reference = f"{spec_type}:{spec_id}"
             if reference in targets:
@@ -213,7 +216,7 @@ class ChangeValidator:
         change: Change,
         metadata: dict[str, Any],
         targets: dict[str, dict[str, Any]],
-    ) -> None:
+    ) -> list[Issue]:
         """校验 delta 文件集合、操作目标、基线与 sync 回执。"""
 
         delta_root = change.path / "deltas"
@@ -233,7 +236,7 @@ class ChangeValidator:
         delta_hashes = self._delta_hashes(actual)
         is_synced = self._validate_sync_receipt(metadata, delta_hashes)
         if is_synced:
-            return
+            return []
 
         required_baselines: dict[str, str] = {}
         for reference, target in targets.items():
@@ -242,7 +245,9 @@ class ChangeValidator:
             required_baselines.update(
                 self._validate_target(spec_type, spec_id, target, delta)
             )
-        self._validate_baselines(metadata.get("baseVersions"), required_baselines)
+        return self._validate_baselines(
+            change.path, metadata.get("baseVersions"), required_baselines
+        )
 
     def _validate_target(
         self,
@@ -286,7 +291,9 @@ class ChangeValidator:
             if operation.operation in {"MODIFIED", "REMOVED", "RENAMED"}
         }
 
-    def _validate_baselines(self, value: Any, expected: dict[str, str]) -> None:
+    def _validate_baselines(
+        self, path: Path, value: Any, expected: dict[str, str]
+    ) -> list[Issue]:
         """要求 YAML 精确记录所有正文变更操作的 64 位 hash。"""
 
         if not expected:
@@ -294,7 +301,7 @@ class ChangeValidator:
                 raise SpecifyError(
                     "没有 MODIFIED/REMOVED/RENAMED 操作时不能有 baseVersions"
                 )
-            return
+            return []
         expected_keys = set(expected)
         if not isinstance(value, dict) or set(value) != expected_keys:
             missing = (
@@ -303,20 +310,33 @@ class ChangeValidator:
                 else sorted(expected_keys)
             )
             extra = (
-                sorted(set(value) - expected_keys) if isinstance(value, dict) else []
+                sorted(set(value) - expected_keys, key=str)
+                if isinstance(value, dict)
+                else []
             )
-            raise SpecifyError(
-                f"baseVersions 键必须与 delta 目标一致；缺少 {missing}，多余 {extra}"
-            )
+            return [
+                Issue(
+                    f"baseVersions 键必须与 delta 目标一致；缺少 {missing}，多余 {extra}",
+                    str(path),
+                    "baseline-keys",
+                    tuple(missing),
+                )
+            ]
         for reference, digest in value.items():
             if not isinstance(digest, str) or not HASH_PATTERN.fullmatch(digest):
                 raise SpecifyError(
                     f"baseVersions 中的 hash 必须是 64 位小写 SHA-256：{reference}"
                 )
             if digest != expected[reference]:
-                raise SpecifyError(
-                    f"Contract 正文基线已变化：{reference}，请按当前正文调整 delta 和 hash"
-                )
+                return [
+                    Issue(
+                        f"Contract 正文基线已变化：{reference}，请按当前正文调整 delta 和 hash",
+                        str(path),
+                        "stale-baseline",
+                        (reference,),
+                    )
+                ]
+        return []
 
     @staticmethod
     def _delta_hashes(files: dict[str, Path]) -> dict[str, str]:

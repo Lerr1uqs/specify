@@ -82,11 +82,17 @@ class Issue:
 
     message: str
     path: str | None = None
+    code: str | None = None
+    references: tuple[str, ...] = ()
 
-    def as_dict(self) -> dict[str, str]:
+    def as_dict(self) -> dict[str, str | list[str]]:
         """转换为 CLI JSON 报告使用的稳定字典结构。"""
 
-        value = {"message": self.message}
+        value: dict[str, str | list[str]] = {"message": self.message}
         if self.path:
             value["path"] = self.path
+        if self.code:
+            value["code"] = self.code
+        if self.references:
+            value["references"] = list(self.references)
         return value
