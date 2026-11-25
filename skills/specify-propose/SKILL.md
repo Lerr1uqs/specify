@@ -40,6 +40,8 @@ description: 根据需求创建 Specify proposed change，或按用户要求进�
 
 每完成一个材料就检查文件内容是否符合上一项的意图。模板提供写作引导，CLI 的 verify 只证明结构、目标和基线有效，不证明业务语义正确。
 
+在正式 Contract 或 delta 的 Contract 正文中，用 `@[<type>:<spec-id>:<contract-id>]` 指向依赖的条目。删除目标时，先找出引用它的正式 Contract，并把来源的删除或改写纳入同一个 Change。重命名标题会保留 ID，引用继续有效；需要变更 ID 或 Spec 路径时显式迁移引用。
+
 ## 完成时的报告
 
 用简短清单说明 change ID 与路径、kind、影响的 spec/Contract、写好的材料、tasks 数量和 verify 结果。若有待用户决定的语义问题，指出对应 Contract 和可选处理方式，不宣称“已可实施”。可告诉用户下一步是实施这个 change；不要在提案阶段运行 implement、sync 或 archive。

@@ -318,6 +318,75 @@ class SpecInspector {
   }
 }
 
+/** 预览正式 Contract 的标题和摘要，点击引用仍按链接跳转。 */
+class ContractReferencePreview {
+  constructor() {
+    this.element = document.createElement("aside");
+    this.element.id = "contract-reference-preview";
+    this.element.className = "contract-reference-preview";
+    this.element.setAttribute("role", "tooltip");
+    this.element.hidden = true;
+    this.title = document.createElement("strong");
+    this.body = document.createElement("p");
+    this.element.append(this.title, this.body);
+    document.body.append(this.element);
+
+    document.addEventListener("pointerover", (event) => {
+      const link = event.target.closest("[data-reference-title]");
+      if (link && event.pointerType !== "touch") this.open(link);
+    });
+    document.addEventListener("pointerout", (event) => {
+      if (this.link?.contains(event.target) && !this.link.contains(event.relatedTarget)
+        && !this.link.matches(":focus-visible")) this.close();
+    });
+    document.addEventListener("focusin", (event) => {
+      const link = event.target.closest("[data-reference-title]");
+      if (link) this.open(link);
+    });
+    document.addEventListener("focusout", (event) => {
+      if (event.target === this.link) this.close();
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && this.link) {
+        event.stopImmediatePropagation();
+        this.close();
+      }
+    });
+    window.addEventListener("scroll", () => this.close(), true);
+    window.addEventListener("resize", () => this.close());
+  }
+
+  /** 将提示框锚定在引用旁，长摘要也保持在视口内。
+   * @param {HTMLAnchorElement} link
+   */
+  open(link) {
+    if (this.link === link) return;
+    this.close();
+    this.link = link;
+    this.title.textContent = link.dataset.referenceTitle;
+    this.body.textContent = link.dataset.referencePreview;
+    link.setAttribute("aria-describedby", this.element.id);
+    this.element.hidden = false;
+    const anchor = link.getBoundingClientRect();
+    const {width, height} = this.element.getBoundingClientRect();
+    const left = Math.max(8, Math.min(anchor.left, innerWidth - width - 8));
+    const top = anchor.bottom + height + 8 > innerHeight
+      ? Math.max(8, anchor.top - height - 8)
+      : anchor.bottom + 8;
+    this.element.style.left = `${left}px`;
+    this.element.style.top = `${top}px`;
+  }
+
+  /** 清除提示和关联，避免正文切换后保留旧内容。 */
+  close() {
+    this.link?.removeAttribute("aria-describedby");
+    this.link = null;
+    this.element.hidden = true;
+  }
+}
+
+new ContractReferencePreview();
+
 const specPanel = document.querySelector("#current-spec-panel");
 if (specPanel) new SpecInspector(specPanel);
 

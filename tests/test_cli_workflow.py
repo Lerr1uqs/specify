@@ -384,19 +384,24 @@ def test_default_requirement_template_creates_valid_distinct_contracts(
     assert source.read_text(encoding="utf-8").count("## [requirement-") == 4
 
 
-def test_default_architecture_capability_component_templates_validate(
+def test_default_architecture_capability_component_and_test_templates_validate(
     tmp_path: Path,
 ) -> None:
     """内置模板复制为正式 spec 后，Contract ID 和标题都不冲突。"""
 
     runner = CliRunner()
     initialize(runner, tmp_path)
-    for spec_type in ("architecture", "capability", "component"):
+    for spec_type in ("architecture", "capability", "component", "test"):
         created = invoke(runner, tmp_path, "create", spec_type, f"sample-{spec_type}")
         assert created.exit_code == 0, created.output
 
     validated = invoke(runner, tmp_path, "validate", "--specs")
     assert validated.exit_code == 0, validated.output
+    acceptance = invoke(runner, tmp_path, "show", "test:sample-test")
+    assert acceptance.exit_code == 0
+    assert all(
+        title in acceptance.output for title in ("前置条件", "验收步骤", "通过标准")
+    )
 
 
 def test_cli_actions_and_no_impact_lifecycle(tmp_path: Path) -> None:
@@ -588,6 +593,171 @@ def test_cli_actions_and_no_impact_lifecycle(tmp_path: Path) -> None:
     )
     archived_context.write_text("有人修改了归档内容。\n", encoding="utf-8")
     assert invoke(runner, tmp_path, "validate", "--archived").exit_code == 1
+
+
+def test_projected_references_resolve_across_deltas(tmp_path: Path) -> None:
+    """同一 Change 内先遇到引用也能通过，并忽略 Markdown 里的语法示例。"""
+
+    runner = CliRunner()
+    initialize(runner, tmp_path)
+    created = invoke(
+        runner,
+        tmp_path,
+        "change",
+        "create",
+        "test",
+        "add-acceptance",
+        "--affect",
+        "test:account:create",
+        "--affect",
+        "rule:policy:create",
+    )
+    assert created.exit_code == 0, created.output
+    change = tmp_path / "spec/changes/processing/test/add-acceptance"
+    delta = change / "deltas/test/account.md"
+    body = (
+        "规则 @[rule:policy:expiry] 和 **@[rule:policy:expiry]** 都可引用。\n\n"
+        "`@[rule:example:inline]` 和 \\@[rule:example:escaped] 是示例。\n\n"
+        "<!-- @[rule:example:comment] -->\n\n"
+        "[链接中的 @[rule:example:label]](https://example.com)\n\n"
+        "```text\n@[rule:example:fenced]\n```\n"
+    )
+    delta.write_text(f"# delta\n\n## [ADDED] [scenario] 必测场景\n\n{body}")
+    (change / "deltas/rule/policy.md").write_text(
+        "# delta\n\n## [ADDED] [expiry] 凭证过期\n\n正式规则。\n"
+    )
+    complete_tasks(change)
+    for action in ("verify", "implement", "sync", "archive"):
+        result = invoke(runner, tmp_path, "change", action, "add-acceptance")
+        assert result.exit_code == 0, result.output
+    assert invoke(runner, tmp_path, "validate", "--specs").exit_code == 0
+
+    spec = tmp_path / "spec/specs/test/account/spec.md"
+    spec.write_text(
+        spec.read_text().replace("rule:policy:expiry", "rule:policy:missing")
+    )
+    result = invoke(runner, tmp_path, "--json", "validate", "--specs")
+    assert result.exit_code == 1
+    issues = json.loads(result.output)["issues"]
+    assert len(issues) == 1
+    assert issues[0]["references"] == ["test:account:scenario", "rule:policy:missing"]
+
+
+def test_reference_survives_other_change_rename_and_protects_removal(
+    tmp_path: Path,
+) -> None:
+    """目标改标题后仍可同步引用；删除会拦截已经正式生效的引用。"""
+
+    runner = CliRunner()
+    initialize(runner, tmp_path)
+    target = write_spec(
+        tmp_path, "rule", "policy", "expiry", "旧名称", "有效期为十分钟。"
+    )
+    write_spec(tmp_path, "test", "account", "scenario", "已有场景", "已有验收标准。")
+    reference = "rule:policy:expiry"
+    removal = "## [REMOVED] [expiry] 新名称\n\n**Reason**: 已停用。\n**Migration**: 更新验收。"
+
+    def prepare(
+        change_id: str, changes: dict[str, str], *, baseline: bool = False
+    ) -> None:
+        """生成真实的 CLI 草稿，写入声明的 delta 并标记已实施。"""
+
+        args = []
+        for spec in changes:
+            args.extend(("--affect", spec))
+        result = invoke(runner, tmp_path, "change", "create", "feat", change_id, *args)
+        assert result.exit_code == 0, result.output
+        directory = tmp_path / "spec/changes/processing/feat" / change_id
+        for spec, body in changes.items():
+            kind, name, _ = spec.split(":")
+            (directory / "deltas" / kind / f"{name}.md").write_text(
+                f"# delta\n\n{body}\n"
+            )
+        if baseline:
+            assert (
+                invoke(runner, tmp_path, "change", "baseline", change_id).exit_code == 0
+            )
+        complete_tasks(directory)
+        result = invoke(runner, tmp_path, "change", "implement", change_id)
+        assert result.exit_code == 0, result.output
+
+    def sync(change_id: str) -> None:
+        """应用声明的正式变更并确认同步成功。"""
+
+        result = invoke(runner, tmp_path, "change", "sync", change_id)
+        assert result.exit_code == 0, result.output
+
+    prepare(
+        "link-acceptance",
+        {
+            "test:account:modify": f"## [ADDED] [linked] 新增场景\n\n验收 @[{reference}]。"
+        },
+    )
+    prepare(
+        "rename-policy",
+        {"rule:policy:modify": "## [RENAMED] [expiry] 旧名称 -> 新名称"},
+        baseline=True,
+    )
+    sync("rename-policy")
+    assert invoke(runner, tmp_path, "change", "archive", "rename-policy").exit_code == 0
+    prepare("remove-policy", {"rule:policy:remove": removal}, baseline=True)
+
+    assert (
+        invoke(runner, tmp_path, "change", "verify", "link-acceptance").exit_code == 0
+    )
+    sync("link-acceptance")
+    page = ReviewPage(RepoPaths(tmp_path))
+    _, html = page.render({"spec": ["test:account"]})
+    assert 'data-reference-title="新名称"' in html
+    _, archived = page.render({"change": ["rename-policy"]})
+    assert "-## 旧名称" in archived and "+## 新名称" in archived
+    before = target.read_bytes()
+    result = invoke(runner, tmp_path, "change", "sync", "remove-policy")
+    assert (
+        result.exit_code == 1 and f"test:account:linked → {reference}" in result.output
+    )
+    assert target.read_bytes() == before
+    rejected_sync = (
+        tmp_path / "spec/changes/implemented/feat/remove-policy/meta-data.yaml"
+    )
+    assert "sync" not in load_yaml(rejected_sync)
+
+    prepare(
+        "restore-policy-title",
+        {"rule:policy:modify": "## [RENAMED] [expiry] 新名称 -> 旧名称"},
+        baseline=True,
+    )
+    sync("restore-policy-title")
+    _, restored = page.render({"spec": ["test:account"]})
+    assert 'data-reference-title="旧名称"' in restored
+    assert 'href="/?spec=rule%3Apolicy#contract-expiry"' in restored
+    timeline = invoke(runner, tmp_path, "history", reference, "--diff", "2", "3")
+    assert timeline.exit_code == 0, timeline.output
+    diff = json.loads(timeline.output)["diff"]
+    assert "-## 新名称" in diff and "+## 旧名称" in diff
+
+    # 一次同步移除目标并改掉来源引用，验证的是合并后的最终状态。
+    prepare(
+        "another-link",
+        {
+            "test:account:modify": f"## [ADDED] [other] 另一场景\n\n依赖 @[{reference}]。"
+        },
+    )
+    prepare(
+        "retire-linked-policy",
+        {
+            "rule:policy:remove": removal.replace("新名称", "旧名称"),
+            "test:account:modify": "## [MODIFIED] [linked] 新增场景\n\n使用新的验收规则。",
+        },
+        baseline=True,
+    )
+    sync("retire-linked-policy")
+    assert not target.exists()
+    assert invoke(runner, tmp_path, "validate", "--specs").exit_code == 0
+    result = invoke(runner, tmp_path, "change", "verify", "another-link")
+    assert (
+        result.exit_code == 1 and f"test:account:other → {reference}" in result.output
+    )
 
 
 def test_change_status_reports_next_step_and_missing_baseline(tmp_path: Path) -> None:

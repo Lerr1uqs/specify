@@ -1,6 +1,9 @@
 """验证 Review 页的差异来源、只读行为与 CLI 入口。"""
 
+import re
+from html import unescape
 from http import HTTPStatus
+from json import loads
 from pathlib import Path
 from shutil import copytree
 
@@ -12,6 +15,41 @@ from specify.paths import RepoPaths
 from specify.web import ReviewPage
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "example_specs"
+
+
+def test_review_links_contracts_and_shows_global_graph() -> None:
+    """正文保留引用，独立图谱只接收正式 Spec 与实际引用边。"""
+
+    page = ReviewPage(RepoPaths(EXAMPLE))
+    _, acceptance = page.render({"spec": ["test:account-recovery-acceptance"]})
+    assert (
+        'href="/?spec=rule%3Arecovery-policy#contract-challenge-expiry"' in acceptance
+    )
+    assert 'data-reference-title="恢复凭证有效期"' in acceptance
+    assert "relation-panel" not in acceptance
+    assert '<a href="/?graph=">Spec 图</a>' in acceptance
+
+    status, graph = page.render({"graph": [""]})
+    assert status == HTTPStatus.OK
+    assert '<a href="/?graph=" aria-current="page">Spec 图</a>' in graph
+    assert 'class="sidebar"' not in graph
+    assert 'src="/spec-graph.js"' in graph
+    payload = re.search(r'data-spec-graph="([^"]+)"', graph)
+    assert payload is not None
+    data = loads(unescape(payload[1]))
+    assert set(data["nodes"]) == set(page.specs)
+    assert data["edges"] == [
+        ["test:account-recovery-acceptance", "capability:account-recovery"],
+        ["test:account-recovery-acceptance", "rule:recovery-policy"],
+    ]
+    assert (
+        "rule:recovery-policy:challenge-expiry"
+        in data["contracts"]["rule:recovery-policy"]
+    )
+
+    _, change = page.render({"change": ["explain-delivery-receipt-outcomes"]})
+    assert 'href="/?spec=capability%3Adelivery-receipts#contract-query-receipt"' in change
+    assert 'data-reference-title="查询通知回执"' in change
 
 
 def test_review_reads_current_specs_and_pending_delta() -> None:

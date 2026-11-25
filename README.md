@@ -61,6 +61,8 @@ uv run specify --root example_specs web
 ```
 
 - **正式 Spec**：按 type 浏览当前规范，点击 Spec 查看简介和 Contract 正文。
+- **Contract 引用**：悬停或聚焦引用可预览当前正式正文，点击跳到具体 Contract。
+- **Spec 图**：顶部独立视图，展示所有正式 Spec 和它们之间的实际引用。悬停节点高亮相邻连线，并显示完整的 `type:spec:contract` 引用。支持点击节点打开 Spec、拖动平移、滚轮缩放和筛选孤立节点。
 - **查找栏**：标题栏右侧的查找栏像 `rg` 一样搜索 Contract 的 ID、标题和正文；命中后左栏只保留命中 Contract 所属的 Spec，右侧只显示命中的 Contract 并高亮关键词。支持区分大小写（`Aa`）、全字匹配（`wd`）、正则（`.*`）和按 type 限定范围；`‹ ›` 或 Enter / Shift+Enter 在命中处之间移动，按 `/` 聚焦，Esc 清空并退出搜索。
 - **图表**：Contract 正文中语言标记为 `pele` 或 `mermaid` 的代码围栏会渲染为 [Pele](https://pele.run) 图表，源码保留在「查看图表源码」中。Pele 以 MIT 许可证内置，不依赖外部 CDN。
 - **Changes**：左侧 Change 通过曲线连到右侧各个 Spec；每个 Spec 用树形折线展开到 Contract。点击 Contract 查看逐行 diff，或用「展开全部」查看当前 Change 的所有差异。点击 Spec 名称可在修改列表旁边打开正式正文，此时 Change 根节点和连线让出空间，收起正文即可恢复影响树。
@@ -76,7 +78,7 @@ Web Review 以只读方式监听本机。保存 Markdown 后，前台页面会�
 
 ## 创建和编写 spec
 
-配置中的每个 `specTypes` 可以通过 `template` 指定写作模板。默认提供 `requirement`、`capability`、`component`、`architecture` 和 `rule` 类型；新增功能使用 `feat` change kind，并通过 delta 更新相应的正式 spec。
+配置中的每个 `specTypes` 可以通过 `template` 指定写作模板。默认提供 `requirement`、`capability`、`component`、`architecture`、`rule` 和 `test` 类型；新增功能使用 `feat` change kind，并通过 delta 更新相应的正式 spec。
 
 ```bash
 cd ./my-project
@@ -86,6 +88,21 @@ specify create requirement password-login
 命令会把配置引用的模板复制到 `spec/specs/<type>/<id>/spec.md`。需求模板示范 `WHEN / THEN / MUST / SHOULD / MAY` 等表述，组件模板介绍职责、边界和依赖，架构模板提供树形结构示例。模板提供写作指引；`validate` 检查 Markdown 与 Contract 结构，不会自动判定业务语义是否完整。
 
 Contract 标题格式为 `## [<contract-id>] <标题>`。方括号中的 kebab-case ID 是稳定标识；类型、spec ID 和 Contract ID 组合成完整引用，例如 `capability:user-auth:password-login`。
+
+在 Contract 的普通 Markdown 正文里写 `@[rule:recovery-policy:challenge-expiry]`，可引用另一条 Contract。行内代码、围栏代码、HTML 注释、普通 Markdown 链接的标签及转义写法 `\@[...]` 保持字面内容。标题重命名保留 ID，因此引用地址不变。要移动 Spec 或更换 ID，在同一个 Change 里显式更新引用来源。
+
+`validate --specs` 检查当前正式引用。`change verify` 和 `change sync` 检查同一次 Change 所有 delta 合并后的正式结果。删除目标前可在同一个 Change 中移除或改写指向它的引用，悬挂引用会在落盘前被拦截，并报告来源和目标。
+
+`test` 类型把每个必须通过的验收场景写成一条 Contract，记录关联 Contract、前置条件、验收步骤和可观察的通过标准。例如 `specify create test account-recovery-acceptance` 会生成验收模板。[查看示例](example_specs/spec/specs/test/account-recovery-acceptance/spec.md)
+
+已有项目可把下列条目加入 `spec/config.yaml` 的 `specTypes`，再从项目根运行 `specify init . --config spec/config.yaml`，补装缺失的内置模板并保留项目配置。
+
+```yaml
+test:
+  label: 测试验收
+  description: 必须通过的验收场景、验证步骤和通过标准
+  template: template/test.md
+```
 
 创建和更新 spec 时可以设置一行简介。简介保存在 `spec.md` 同级的 `meta-data.yaml`，命令会同步刷新 `spec/spec-index.md`。`list --spec` 默认用缩进文本按 type 展示 ID、相对项目根的路径和简介，`--human` 切换为 Rich 树，`specify --json list --spec` 返回完整字段。
 

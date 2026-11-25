@@ -42,6 +42,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "description": "跨能力或组件适用的稳定约束",
             "template": "template/rule.md",
         },
+        "test": {
+            "label": "测试验收",
+            "description": "必须通过的验收场景、验证步骤和通过标准",
+            "template": "template/test.md",
+        },
     },
     "kinds": {
         "feat": {"label": "功能", "description": "新增或扩展正式能力、组件或规则"},

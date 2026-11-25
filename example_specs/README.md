@@ -8,7 +8,9 @@ uv run specify --root example_specs list --spec --human
 uv run specify --root example_specs status --human
 ```
 
-第一条展示活跃 change 的状态、kind 和 tasks 进度。第二条展示五种正式 spec，包括用户能力、组件职责、业务需求、架构和规则。第三条同时展示正式 spec 和未归档 change，包含 rejected。`list --spec` 默认输出缩进文本。`list` 和 `status` 默认输出 JSON。
+第一条展示活跃 change 的状态、kind 和 tasks 进度。第二条展示六种正式 spec，包括用户能力、组件职责、业务需求、架构、规则和测试验收。第三条同时展示正式 spec 和未归档 change，包含 rejected。`list --spec` 默认输出缩进文本。`list` 和 `status` 默认输出 JSON。
+
+[`test:account-recovery-acceptance`](spec/specs/test/account-recovery-acceptance/spec.md) 展示如何把必须通过的场景写成验收 Contract，并用 `@[type:spec-id:contract-id]` 关联正式规则和能力。在 Web 中悬停可预览目标，打开顶部「Spec 图」可查看验收 Spec 和关联规则、能力的连线。
 
 ## 五种 change 状态
 
@@ -40,7 +42,7 @@ uv run specify --root example_specs web
 | --- | --- | --- |
 | `launch-delivery-receipts` | 已归档 | 新增整份 `capability:delivery-receipts` 和 `rule:receipt-pilot`；同时给现有 `component:notification-service` 新增一条 Contract。 |
 | `retire-receipt-pilot` | 已归档 | 删除整份 `rule:receipt-pilot` 及其中两条 Contract，并修改正式回执能力。试点规则已不在正式 Spec 列表，但当时的删除 diff 仍可查。 |
-| `explain-delivery-receipt-outcomes` | 已实施，未同步 | 仅重命名一条 Contract、新增一条结果说明、修改通知服务接口，并预览新增保留规则。打开当前正式 Spec，对照仍生效的原名称和正文。 |
+| `explain-delivery-receipt-outcomes` | 已实施，未同步 | 新增回执保留规则，并用 `@[capability:delivery-receipts:query-receipt]` 引用同一个 Change 中修改标题的 Contract。同步前可预览原标题，同步后引用仍通过原 ID 打开新标题。 |
 
 前两项通过 CLI 同步并归档，保留真实回执和版本快照；最后一项故意停在 `implemented`，以便检查尚未生效的预览。还可以打开 `publish-recovery-controls` 查看一次 change 如何影响四份不同类型的 Spec。
 

@@ -26,6 +26,7 @@ specify = [
   "assets/templates/*.md",
   "assets/review.css",
   "assets/review.js",
+  "assets/spec-graph.js",
   "assets/pele.js",
   "assets/pele.LICENSE",
 ]

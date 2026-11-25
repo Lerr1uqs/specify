@@ -19,6 +19,10 @@ specTypes:
     label: 规则
     description: 跨能力或组件适用的稳定约束
     template: template/rule.md
+  test:
+    label: 测试验收
+    description: 必须通过的验收场景、验证步骤和通过标准
+    template: template/test.md
 
 kinds:
   feat:

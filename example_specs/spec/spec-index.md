@@ -27,3 +27,7 @@
 
 - [`audit-policy`](specs/rule/audit-policy/spec.md) — 身份与投递事件的审计字段及留存周期
 - [`recovery-policy`](specs/rule/recovery-policy/spec.md) — 恢复凭证的有效期和验证尝试约束
+
+## Test
+
+- [`account-recovery-acceptance`](specs/test/account-recovery-acceptance/spec.md) — 账号恢复凭证过期和一次性使用的必过验收场景

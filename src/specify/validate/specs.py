@@ -6,9 +6,10 @@ from pathlib import Path
 from typing import Any
 
 from ..errors import SpecifyError
-from ..models import Issue
+from ..models import Issue, SpecDocument
 from ..parse.spec import SpecParser
 from ..paths import RepoPaths, validate_id
+from ..references import ContractLinks
 
 
 class SpecTreeValidator:
@@ -39,16 +40,18 @@ class SpecTreeValidator:
         """收集所有 formal spec 中的首个结构或内容错误。"""
 
         issues: list[Issue] = []
+        documents: dict[Path, SpecDocument] = {}
         for path in self.files():
             if not validate_id(path.parent.name):
                 issues.append(
                     Issue("spec id 必须为 kebab-case", path.parent.as_posix())
                 )
             try:
-                self.parser.parse_file(path)
+                documents[path] = self.parser.parse_file(path)
             except SpecifyError as exc:
                 issues.append(Issue(exc.message, str(exc.path or path)))
-        return issues
+        # 格式问题修复后再核对完整图，避免一次坏文件被误报成多个悬挂引用。
+        return issues or ContractLinks(documents).validate()
 
 
 def formal_spec_files(paths: RepoPaths, config: dict[str, Any]) -> list[Path]:

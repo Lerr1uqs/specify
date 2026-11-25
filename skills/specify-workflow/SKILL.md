@@ -32,3 +32,5 @@ Specify 项目以 `spec/config.yaml` 为入口。正式规范在 `spec/specs/<ty
 交接一个 change 时，用 `specify --json change status <change-id>` 查看阶段、相关文件、剩余任务、缺失项和 `nextStep`。处理过期基线前先复核 delta 与当前 Contract。需要审查当前实现是否兑现 Contract，或检查相关 Contract 的语义冲突时，使用 [specify-audit](../specify-audit/SKILL.md)。
 
 当前校验按 Contract 正文 hash 检测已捕获基线的变化。两个 change 修改同一个 spec 中不同的 Contract 时，只要各自依赖的 Contract 正文没有变化，verify 不会因为它们共享 spec 而拒绝。
+
+在 Contract 正文里写 `@[<type>:<spec-id>:<contract-id>]` 建立引用。用 `specify validate --specs` 检查已生效引用；`change verify` 和 `sync` 会检查同一 Change 所有 delta 的合并结果。删除目标时在同一 Change 中更新来源。改标题保留 ID，引用地址保持不变。代码块、行内代码和转义中的写法可用来展示示例。

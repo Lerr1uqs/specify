@@ -15,11 +15,11 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.resources import files
 from itertools import groupby
+from json import dumps
 from pathlib import Path
 from threading import Thread
 from urllib.parse import parse_qs, urlencode
 
-from markdown_it import MarkdownIt
 from markdown_it.token import Token
 from markdown_it.utils import EnvType, OptionsDict
 
@@ -42,6 +42,7 @@ from .parse.delta import parse_delta_file
 from .parse.spec import parse_spec_file
 from .parse.tasks import parse_tasks_file
 from .paths import RepoPaths, scan_changes, validate_id
+from .references import ContractLinks, reference_markdown
 from .spec_metadata import SpecMetadata
 from .validate.changes import read_metadata
 
@@ -121,11 +122,74 @@ class ReviewPage:
         }
         self.changes = {change.id: change for change in scan_changes(paths)}
         self.history = ContractHistory(paths)
-        # 不执行项目文档中的 HTML，也不自动加载外部图片。
-        self.markdown = MarkdownIt("commonmark", {"html": False}).disable("image")
+        self._links: ContractLinks | None = None
+        # 识别 HTML 块以忽略其中的引用，但原样转义，不执行项目文档中的 HTML。
+        self.markdown = reference_markdown()
+        self.markdown.renderer.rules["html_block"] = self.render_inert_html
+        self.markdown.renderer.rules["html_inline"] = self.render_inert_html
+        self.markdown.renderer.rules["contract_reference"] = self.render_reference
         # 保留默认围栏规则，把 pele/mermaid 代码块替换成可挂载的图表容器。
         self.default_fence = self.markdown.renderer.rules["fence"]
         self.markdown.renderer.rules["fence"] = self.render_fence
+
+    def contract_links(self) -> ContractLinks:
+        """按需读取当前正式 Spec，在本次页面渲染时共用关系图。"""
+
+        if self._links is None:
+            documents = {}
+            for path in self.specs.values():
+                try:
+                    documents[path] = parse_spec_file(path)
+                except READ_ERRORS:
+                    # 单份 Spec 无法读取时，直接打开它会显示原错误。
+                    continue
+            self._links = ContractLinks(documents)
+        return self._links
+
+    @staticmethod
+    def render_inert_html(
+        tokens: Sequence[Token], index: int, options: OptionsDict, env: EnvType
+    ) -> str:
+        """显示原始 HTML 文本，保留只读 Review 对不可信文档的限制。"""
+
+        return escape(tokens[index].content)
+
+    def render_reference(
+        self, tokens: Sequence[Token], index: int, options: OptionsDict, env: EnvType
+    ) -> str:
+        """将引用链接到当前正式 Contract，缺失时明确标记。"""
+
+        reference = tokens[index].content
+        contract = self.contract_links().contracts.get(reference)
+        if contract is None:
+            return f'<span class="contract-reference-missing" title="目标 Contract 不存在">@[{escape(reference)}]</span>'
+        spec, contract_id = reference.rsplit(":", 1)
+        url = escape(urlencode({"spec": spec}))
+        blocks = self.markdown.parse(contract.body)
+        # 摘要取正文文本，省去 Markdown 标记和章节标题。
+        snippets = [
+            "".join(
+                " " if child.type in {"softbreak", "hardbreak"} else child.content
+                for child in block.children or []
+                if child.type
+                in {
+                    "text",
+                    "code_inline",
+                    "contract_reference",
+                    "softbreak",
+                    "hardbreak",
+                }
+            )
+            for position, block in enumerate(blocks)
+            if block.type == "inline" and blocks[position - 1].type != "heading_open"
+        ]
+        summary = " ".join(" ".join(snippets).split())
+        preview = summary if len(summary) <= 160 else summary[:159] + "…"
+        return (
+            f'<a class="contract-reference" href="/?{url}#contract-{contract_id}" '
+            f'data-reference-title="{escape(contract.title)}" data-reference-preview="{escape(preview)}">'
+            f"{escape(reference)}</a>"
+        )
 
     def render_fence(
         self,
@@ -157,6 +221,9 @@ class ReviewPage:
     ) -> tuple[HTTPStatus, str]:
         """按当前 tab 生成导航和详情；未知引用不进入磁盘读取流程。"""
 
+        self._links = None
+        if "graph" in query:
+            return HTTPStatus.OK, self.review_shell("graph", self.spec_graph(), revision)
         # 查找词、大小写/全字/正则开关和类型限定共同决定左栏范围与正文高亮。
         search = query.get("q", [""])[0].strip()
         use_regex = query.get("re", [""])[0] == "1"
@@ -288,23 +355,86 @@ class ReviewPage:
             if '<figure class="diagram" data-pele>' in detail
             else ""
         )
-        return (
-            status,
-            f"""<!doctype html>
+        return status, self.review_shell(
+            tab, detail, revision, findbar, sidebar, cutoff, diagram_script
+        )
+
+    def review_shell(
+        self,
+        tab: str,
+        detail: str,
+        revision: str,
+        findbar: str = "",
+        sidebar: str = "",
+        cutoff: str = "",
+        diagram_script: str = "",
+    ) -> str:
+        """共用顶部导航，关系图独占整行阅读区域。"""
+
+        script = (
+            '<script src="/spec-graph.js" defer></script>'
+            if tab == "graph"
+            else diagram_script
+        )
+        navigation = (
+            "" if tab == "graph"
+            else f'<nav class="sidebar" aria-label="项目列表">{sidebar}</nav>'
+        )
+        layout = "graph-layout" if tab == "graph" else "layout"
+        return f"""<!doctype html>
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="specify-revision" content="{escape(revision)}">
 <title>Specify · Review</title><link rel="stylesheet" href="/review.css">
-{diagram_script}<script src="/review.js" defer></script></head>
+{script}<script src="/review.js" defer></script></head>
 <body><a class="skip" href="#review">跳到详情</a>
 <header><div class="frame"><h1>Specify <small>Review</small></h1>
 <p>{escape(self.paths.root.name)} <span class="pill">本地只读</span></p>
 <div class="header-bar"><nav aria-label="视图">{link("spec", "", f"正式 Spec ({len(self.specs)})", tab == "spec")}
-{link("change", "", f"Changes ({len(self.changes)})", tab == "change", cutoff=cutoff)}</nav>
+{link("change", "", f"Changes ({len(self.changes)})", tab == "change", cutoff=cutoff)}
+{link("graph", "", "Spec 图", tab == "graph")}</nav>
 {findbar}</div></div></header>
-<div class="frame layout"><nav class="sidebar" aria-label="项目列表">{sidebar}</nav>
-<main id="review">{detail}</main></div></body></html>""",
-        )
+<div class="frame {layout}">{navigation}
+<main id="review">{detail}</main></div></body></html>"""
+
+    def spec_graph(self) -> str:
+        """向全局关系图传入正式 Spec 节点与跨 Spec 引用。"""
+
+        if not self.specs:
+            return notice("当前项目还没有正式 Spec。")
+        links = self.contract_links()
+        contracts: dict[str, list[str]] = {reference: [] for reference in self.specs}
+        for reference in links.contracts:
+            spec, _ = reference.rsplit(":", 1)
+            contracts[spec].append(reference)
+        graph = {
+            "nodes": list(self.specs),
+            "edges": links.spec_edges(),
+            "contracts": contracts,
+        }
+        return f"""
+<section class="spec-graph" data-spec-graph="{escape(dumps(graph))}">
+  <div class="spec-graph-bar">
+    <h2 id="graph-title">Spec 图</h2>
+    <div class="spec-graph-controls">
+      <label><input type="checkbox" data-graph-isolates checked> 孤立节点</label>
+      <div class="spec-graph-zoom" aria-label="缩放">
+        <button type="button" data-graph-zoom="out" aria-label="缩小">−</button>
+        <button type="button" data-graph-zoom="reset" aria-label="重置视图">重置</button>
+        <button type="button" data-graph-zoom="in" aria-label="放大">+</button>
+      </div>
+    </div>
+  </div>
+  <div class="spec-graph-stage">
+    <svg class="spec-graph-canvas" tabindex="0" aria-labelledby="graph-title"
+      aria-describedby="graph-help"><g data-graph-world></g></svg>
+    <aside class="spec-graph-preview" data-graph-preview hidden>
+      <strong data-graph-preview-name></strong>
+      <ul data-graph-preview-contracts aria-label="完整 Contract 引用"></ul>
+    </aside>
+  </div>
+  <p id="graph-help" class="spec-graph-help">拖动空白处平移，滚轮缩放，点击节点打开 Spec</p>
+</section>"""
 
     def search_form(self, state: SearchState, hit_total: int) -> str:
         """渲染标题栏右侧的查找栏：输入、条件开关和命中步进。"""
@@ -1169,6 +1299,7 @@ def serve_review(paths: RepoPaths, announce: Callable[[str], None]) -> None:
         for route, media_type in {
             "/review.css": "text/css",
             "/review.js": "text/javascript",
+            "/spec-graph.js": "text/javascript",
             # Pele 以 MIT 许可证内置，避免本地 Review 依赖外部 CDN。
             "/pele.js": "text/javascript",
         }.items()

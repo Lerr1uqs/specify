@@ -16,6 +16,8 @@ from ..parse.delta import parse_delta_file
 from ..parse.spec import parse_spec_file
 from ..parse.tasks import parse_tasks_file
 from ..paths import RepoPaths, scan_changes, validate_id
+from ..references import ContractLinks
+from .specs import formal_spec_files
 
 HASH_PATTERN = re.compile(r"^[0-9a-f]{64}$")
 MERGER = DeltaMerger()
@@ -239,27 +241,38 @@ class ChangeValidator:
             return []
 
         required_baselines: dict[str, str] = {}
+        projected: dict[Path, SpecDocument] = {}
         for reference, target in targets.items():
             spec_type, spec_id = reference.split(":", 1)
+            spec_path = self.paths.specs / spec_type / spec_id / "spec.md"
             delta = parse_delta_file(actual[reference])
-            required_baselines.update(
-                self._validate_target(spec_type, spec_id, target, delta)
+            updated, baselines = self._validate_target(
+                spec_path, reference, target, delta
             )
-        return self._validate_baselines(
+            projected[spec_path] = updated
+            required_baselines.update(baselines)
+        baseline_issues = self._validate_baselines(
             change.path, metadata.get("baseVersions"), required_baselines
         )
+        if baseline_issues or not projected:
+            return baseline_issues
+
+        # 未修改的 Spec 也可能引用本次删除的节点；检查整批 delta 合并后的视图。
+        documents = {
+            path: parse_spec_file(path)
+            for path in formal_spec_files(self.paths, self.config)
+            if path not in projected
+        }
+        return ContractLinks(documents | projected).validate()
 
     def _validate_target(
         self,
-        spec_type: str,
-        spec_id: str,
+        spec_path: Path,
+        reference: str,
         target: dict[str, Any],
         delta: DeltaDocument,
-    ) -> dict[str, str]:
-        """校验单个 delta 与其 formal spec 的当前版本一致。"""
-
-        reference = f"{spec_type}:{spec_id}"
-        spec_path = self.paths.specs / spec_type / spec_id / "spec.md"
+    ) -> tuple[SpecDocument, dict[str, str]]:
+        """校验一个 delta，返回合并后的 Spec 和当前正文基线。"""
         exists = spec_path.is_file()
         operation_kinds = {operation.operation for operation in delta.operations}
         if target["change"] == "create":
@@ -267,8 +280,7 @@ class ChangeValidator:
                 raise SpecifyError(f"create 目标 spec 已存在：{reference}")
             if operation_kinds != {"ADDED"}:
                 raise SpecifyError(f"create 目标只能包含 ADDED 操作：{reference}")
-            MERGER.apply(SpecDocument(), delta)
-            return {}
+            return MERGER.apply(SpecDocument(), delta), {}
 
         if not exists:
             raise SpecifyError(f"目标 spec 不存在：{reference}")
@@ -283,8 +295,8 @@ class ChangeValidator:
             raise SpecifyError(f"modify 操作不能删除整个 spec：{reference}")
 
         current_by_id = {contract.id: contract for contract in current.contracts}
-        return {
-            f"{spec_type}:{spec_id}:{operation.contract_id}": ContractIdentity.body_hash(
+        return updated, {
+            f"{reference}:{operation.contract_id}": ContractIdentity.body_hash(
                 current_by_id[operation.contract_id].body
             )
             for operation in delta.operations

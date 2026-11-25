@@ -317,6 +317,131 @@ main h2 { margin: 0; }
 .diagram-source summary { color: var(--muted); }
 .diagram-source pre { max-height: 320px; margin: 8px 0 0; overflow: auto; }
 .card h3, .card h4 { margin: 4px 0; }
+.card[id^="contract-"] { scroll-margin-top: 16px; }
+.card:target { border-color: var(--accent); }
+.contract-reference { overflow-wrap: anywhere; text-underline-offset: 3px; }
+.contract-reference-missing { color: #892835; text-decoration: underline dotted; }
+.contract-reference-preview {
+  position: fixed;
+  z-index: 5;
+  box-sizing: border-box;
+  width: min(23rem, calc(100vw - 16px));
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #fff;
+  box-shadow: 0 6px 18px rgb(23 38 58 / 14%);
+  color: var(--ink);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+.contract-reference-preview p { margin: 4px 0 0; color: var(--muted); }
+/* 独立图谱视图占满内容区，深色画布突出节点和关联线。 */
+.graph-layout { padding-block: 24px 32px; }
+.spec-graph {
+  color: #e8eef7;
+  background: #172230;
+  border: 1px solid #283647;
+  border-radius: 10px;
+  overflow: hidden;
+}
+.spec-graph-bar, .spec-graph-controls, .spec-graph-zoom {
+  display: flex;
+  align-items: center;
+}
+.spec-graph-bar {
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #344456;
+}
+.spec-graph-bar h2 { margin: 0; font-size: 1rem; }
+.spec-graph-controls { flex-wrap: wrap; gap: 8px 16px; font-size: 0.875rem; }
+.spec-graph-controls label { display: inline-flex; gap: 5px; align-items: center; }
+.spec-graph-controls input { accent-color: #77c9bd; }
+.spec-graph-zoom { border: 1px solid #43566c; border-radius: 6px; }
+.spec-graph-zoom button {
+  min-width: 32px;
+  padding: 4px 8px;
+  border: 0;
+  margin: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.spec-graph-zoom button + button { border-left: 1px solid #43566c; }
+.spec-graph-zoom button:hover { background: #2a3b50; }
+.spec-graph :focus-visible { outline-color: #93dbcf; }
+.spec-graph-stage { position: relative; }
+.spec-graph-canvas {
+  display: block;
+  width: 100%;
+  height: clamp(330px, calc(100dvh - 310px), 900px);
+  background: radial-gradient(ellipse at center, #1e2d3e, #151f2c 80%);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.spec-graph-canvas:focus-visible { outline-offset: -3px; }
+.spec-graph-canvas.is-dragging { cursor: grabbing; }
+.spec-graph-edge { stroke: #647992; stroke-width: 1.15; vector-effect: non-scaling-stroke; }
+.spec-graph-edge.is-active { stroke: #9fe0d4; stroke-width: 1.8; }
+.spec-graph-node { color: #a5b8d1; cursor: pointer; }
+.spec-graph-node[data-spec-type="test"] { color: #d8b6ed; }
+.spec-graph-node[data-spec-type="rule"] { color: #f0c595; }
+.spec-graph-node[data-spec-type="capability"] { color: #86d7c8; }
+.spec-graph-hit { fill: transparent; }
+.spec-graph-dot { fill: currentColor; stroke: #172230; stroke-width: 2; }
+.spec-graph-node text {
+  fill: #e2eaf6;
+  stroke: #1b2736;
+  stroke-width: 3;
+  paint-order: stroke;
+  font: 13px var(--font-ui);
+}
+.spec-graph-node.is-active .spec-graph-dot { stroke: #fff; }
+.spec-graph-node.is-active text { fill: #fff; font-weight: 650; }
+.spec-graph-node.is-muted, .spec-graph-edge.is-muted { opacity: 0.2; }
+.spec-graph-node.is-hidden { display: none; }
+.spec-graph-node text.is-crowded,
+.spec-graph-canvas.is-zoomed-out .spec-graph-node:not(.is-active) text {
+  opacity: 0;
+  pointer-events: none;
+}
+.spec-graph-preview {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  box-sizing: border-box;
+  width: max-content;
+  max-width: min(320px, calc(100% - 24px));
+  max-height: min(14rem, 36%);
+  overflow: auto;
+  padding: 8px 12px;
+  border: 1px solid #43566c;
+  border-radius: 6px;
+  background: #192737;
+  box-shadow: 0 4px 14px #111a26a8;
+  overflow-wrap: anywhere;
+}
+.spec-graph-preview strong { font-size: 0.875rem; }
+.spec-graph-preview ul {
+  margin: 4px 0 0;
+  padding: 0;
+  color: #c1d2e6;
+  list-style: none;
+  font: 0.75rem/1.6 var(--font-code);
+}
+.spec-graph-help {
+  margin: 0;
+  padding: 8px 16px;
+  border-top: 1px solid #344456;
+  color: #bccee3;
+  font-size: 0.8rem;
+}
 .proposal-document {
   max-block-size: min(65vh, 48rem);
   overflow: auto;
